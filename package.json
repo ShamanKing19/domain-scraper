@@ -1,0 +1,37 @@
+{
+  "name": "domains",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "supervisor index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://gitlab.com/skillline/domains.git"
+  },
+  "author": "Xhonor",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://gitlab.com/skillline/domains/issues"
+  },
+  "homepage": "https://gitlab.com/skillline/domains#readme",
+  "dependencies": {
+    "axios": "^0.26.1",
+    "express": "^4.17.3",
+    "jimp": "^0.16.1",
+    "jquery": "^3.6.0",
+    "jquery-html-parser": "^1.0.0",
+    "jsdom": "^19.0.0",
+    "node-html-parser": "^5.3.3",
+    "path": "^0.12.7",
+    "phantom": "^6.3.0",
+    "pm2": "^5.2.0",
+    "puppeteer": "^13.5.2",
+    "puppeteer-core": "^13.5.2",
+    "supervisor": "^0.12.0",
+    "text-from-image": "^1.1.1"
+  }
+}
