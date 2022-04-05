@@ -1,14 +1,24 @@
-import parse from 'jquery-html-parser';
 import axios from 'axios';
 import express from 'express';
 const app = express();
 const router = express.Router(({ mergeParams: true }));
-import phantom from 'phantom';
-import { escapeHtml, sleep } from './functions.js';
-import ReadText from 'text-from-image';
-import Jimp from 'jimp';
+import { escapeHtml, sleep, downloadFile, countFileLines } from './functions.js';
+import fs from "fs";
+import mysql from "mysql2";
+import LineByLineReader from "line-by-line";
+import StreamZip from 'node-stream-zip';
+import cliProgress from 'cli-progress';
+import util from 'util';
 
 const port = 3000;
+const connection = await mysql.createConnection({
+    host: 'localhost',
+    user: 'admin_domains',
+    database: 'admin_domains',
+    password: 'vHVLHeoSrk'
+});
+
+const query = util.promisify(connection.query).bind(connection);
 
 app.use(express.json());
 app.use('/', router);
@@ -28,102 +38,66 @@ let userAgents = [
     'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0'
 ];
 
-router.get("/start", async function (req, res) {
-    /*const response = await axios.get('https://i.imgur.com/hzsNhsA.png',  { responseType: 'arraybuffer' })
-    const image = await Jimp.read(response.data);
-    image.color([{apply:'darken', params: [30]}]).write('as.png');
+let zones = [
+    'ru',
+    'su',
+    'rf'
+];
 
-    image.getBuffer(Jimp.MIME_PNG, (err, buffer) => {
-        ReadText(buffer).then(text => {
-            console.log(text);
-        }).catch(err => {
-            console.log(err);
-        })
-    });*/
+const archivePath = 'archives/';
 
-    /*try {
-        let data;
-        for (let i = 1; i < 50000; i++) {
-            let homeUrl = 'https://statonline.ru/domains?page=' + i +
-                '&rows_per_page=200&order=ASC&sort_field=domain_name_idn&registered=REGISTERED&tld=ru' +
-                '&l_9c1b65077e36b0b9d90075edbb7d868c=1';
+async function t (zones) {
+    if (!zones.length) return;
+    
+    const zone = zones.shift();
 
-            console.log(homeUrl);
-            headers["User-Agent"] = userAgents[Math.floor(Math.random() * userAgents.length)];
-            const response = await axios.get(homeUrl, {
-                headers: headers,
-                method: 'GET',
-                maxRedirects: 50,
-            });
+    let homeUrl = 'https://statonline.ru/domainlist/file?tld=' + zone;
+    await downloadFile(homeUrl, archivePath + zone + '.zip');
 
-            data = response.data.toString();
-            const html = parse(data);
+    let zip = new StreamZip.async({ file: archivePath + zone + '.zip' });
+    const count = await zip.extract(null, archivePath + 'extracted');
+    await zip.close();
+    console.log('Unpacked: ' + zone + ' archive!\n');
 
-            if(i === 1) {
-                break;
+    let filename = archivePath + 'extracted/' + zone + '_domains.txt';
+    let lr = new LineByLineReader(filename);
+    let linesCount = await countFileLines(filename);
+
+    const bar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+    bar.start(linesCount, 0);
+
+    let countAdded = 0;
+    lr.on('line', function (line) {
+        lr.pause();
+        countAdded++;
+        let domain = line.split(';')[0];
+
+        let arr = [domain, zone];
+        let sql = "INSERT IGNORE INTO domains(domain, zone) VALUES(?, ?)";
+
+        (async () => {
+            try {
+                query(sql, arr).then(r => { bar.increment(); });
+            } catch(error) {
+                console.log(error);
             }
+        })()
 
-            console.log(response.data);
-        }
-
-        res.json(data);
-    } catch(err) {
-        return res.status(403).json({
-            'status': false,
-            'error': err.message,
-        });
-    }*/
-
-    const instance = await phantom.create();
-    const page = await instance.createPage();
-    //https://phantomjs.org/api/webpage/handler/on-resource-requested.html
-    await page.on('onResourceRequested', function(requestData) {
-        //console.info('Requesting', requestData.url);
+        setTimeout(function () {
+            lr.resume();
+        }, 1);
     });
 
-    let result = [];
-    for (let i = 1; i < 50000; i++) {
-        let homeUrl = 'https://statonline.ru/domains?page=' + i +
-            '&rows_per_page=200&order=ASC&sort_field=domain_name_idn&registered=REGISTERED&tld=ru' +
-            '&l_9c1b65077e36b0b9d90075edbb7d868c=1';
+    
+    lr.on('end', function () {
+        t(zones);
+        bar.stop();
+    })
+}
 
-        let status = await page.open(homeUrl);
-        let content = await page.property('content');
-        let $ = parse(content)
-
-        let tbody = $('table.rustat_table tbody tr');
-
-        if (tbody.length) {
-            tbody.each(function () {
-                let td = $(this).find('td');
-                let domainTd = td.eq(2);
-                if (domainTd) {
-                    let domainHref = domainTd.find('a');
-                    if (domainHref) {
-                        let href = domainHref.attr('href');
-                        let urlParams = new URLSearchParams(href)
-                        if (urlParams.has('domain')) {
-                            let domainName = urlParams.get('domain');
-                            if (domainName) {
-                                result.push(domainName);
-                            }
-                        }
-
-                    }
-                }
-            });
-        }
-
-        await sleep(2);
-
-        if(i >= 5) {
-            break;
-        }
-    }
-
-    res.json(result);
-
-    await instance.exit();
-});
+const isUpdate = process.argv.find(el => el.trim() === 'db_update');
+if(isUpdate) {
+    await t(zones);
+}
 
 app.listen(port);
