@@ -46,7 +46,7 @@ let zones = [
 
 const archivePath = 'archives/';
 
-async function t (zones) {
+async function t(zones) {
     if (!zones.length) return;
     
     const zone = zones.shift();
