@@ -17,7 +17,9 @@ async function makeRequestAsync(domain, index) {
     }).then(function (response) {
         console.log("№" + index + " " + response.config['url'] + " " + response.status);
     }).catch(function (err) {
-        console.log("№" + index + " " + url + " " + err.message);
+        setTimeout(()=>{
+            console.log("№" + index + " " + url + " " + err.message);
+        }, 2000)
     });
 }
 
