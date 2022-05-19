@@ -2,12 +2,15 @@ import { userAgents } from './functions.js';
 import axios from 'axios';
 import mysql from 'mysql2';
 import 'dotenv/config';
-import https from 'http'
+import https from 'http';
+import fs from "fs";
 
 async function makeRequestAsync(domain, index) {
     let url = "http://" + domain;
 
     await axios.get(url, {
+        key: fs.readFileSync('agent2-key.pem'),
+        cert: fs.readFileSync('agent2-cert.pem'),
         timeout: 5000,
         userAgents: userAgents(),
         maxRedirects: 3,
