@@ -7,9 +7,11 @@ import fs from "fs";
 
 async function makeRequestAsync(domain, index) {
     let url = "http://" + domain;
+    const cancelTokenSource = axios.CancelToken.source();
 
     await axios.get(url, {
-        timeout: 5000,
+        cancelToken: cancelTokenSource.token,
+        timeout: 3000,
         key: fs.readFileSync('agent2-key.pem'),
         cert: fs.readFileSync('agent2-cert.pem'),
         userAgents: userAgents(),
@@ -23,6 +25,8 @@ async function makeRequestAsync(domain, index) {
     }).catch(function (err) {
         console.log("№" + index + " " + url + " " + err.message);
     });
+    cancelTokenSource.cancel();
+    console.log("Время выполнения: " + performance.now()/1000);
 }
 
 function parseDomains(previewPortion, tempPortion) {
@@ -38,7 +42,7 @@ function parseDomains(previewPortion, tempPortion) {
 
         if (!error) {
             for (let item of result) {
-                makeRequestAsync(item['domain'], tempPortion++);
+                makeRequestAsync(item['domain'], (tempPortion++)-50);
             }
 
         } else {
@@ -56,19 +60,25 @@ function parseDomains(previewPortion, tempPortion) {
     });
 }
 
+function makeRequestCreator(startPortionTime) {
+
+}
 
 let tempPortion = 0;
-let previewPortion=90;
+let previewPortion=50;
 function echoPortion(){
-    const portion = 90;
-    previewPortion = tempPortion-portion+90;
+    let startPortionTime = performance.now()/1000;
+    console.log("============================================== Порция началась " + performance.now()/1000 + "==================================================");
+    const portion = 50;
+    previewPortion = tempPortion-portion+50;
     tempPortion = tempPortion+portion;
     parseDomains(previewPortion,tempPortion);
+    makeRequestCreator(startPortionTime);
 }
 
 setInterval(function () {
     echoPortion();
-}, 5010);
+}, 3000);
 
 
 
