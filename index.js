@@ -19,7 +19,6 @@ async function makeRequestAsync(domain, index) {
     }).catch((err) => {
         console.log("№" + index + " " + url + " " + err.message);
     });
-
 }
 
 function parseDomains() {
@@ -35,14 +34,6 @@ function parseDomains() {
     connection.query(sql_query, function (error, result) {
         
         if (!error) {
-            
-            //version 3
-            for (let item of result) {
-                makeRequestAsync(item['domain'], ++i);
-            }
-            
-            //version2
-            /*
             let i = 0;
             result.forEach(async (item) => {
                 await makeRequestAsync(item['domain'], ++i);
@@ -55,13 +46,10 @@ function parseDomains() {
             });
             */
         }
-
-
         else {
             throw new Error(error);
         }
     });
-
 
 
     connection.end(function (err) {
