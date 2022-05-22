@@ -1,25 +1,30 @@
+from sqlite3 import connect
 import time
 import asyncio
 import aiohttp
-import mysql.connector
-from mysql.connector import Error
+import pymysql
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning) 
 
-def create_connection(host_name, user_name, user_password, db_name):
-    connection = None
-    try:
-        connection = mysql.connector.connect(
-            host=host_name,
-            user=user_name,
-            passwd=user_password,
-            database=db_name
-        )
-        print("Connection to MySQL DB successful")
-    except Error as e:
-        print(f"The error '{e}' occurred")
 
+def create_connection(host_name, user_name, user_password, db_name):
+    connection = pymysql.connect(host=host_name, user=user_name, password=user_password, database=db_name, cursorclass=pymysql.cursors.DictCursor)
     return connection
+
+def insert_into_db(connection, table_name, domain, zone, real_domain, status):
+    with connection.cursor() as cursor:
+        sql = f"INSERT INTO {table_name} (domain, zone, real_domain, status) VALUES ('{domain}', '{zone}', '{real_domain}', '{status}')"
+        cursor.execute(sql)
+    connection.commit()
+
+
+def select_from_db(connection):
+    with connection.cursor() as cursor:
+        # Read a single record
+        sql = "SELECT * FROM `users` WHERE `status`= 200"
+        cursor.execute(sql)
+        result = cursor.fetchone()
+        print(result)
 
 
 def get_headers():
@@ -58,21 +63,24 @@ async def process_domain(domain, counter, connection, start_time):
     try:
         # TODO: Вот тут без async with вылетали ошибки с unclosed connection
         async with session.get(domain, headers=get_headers()) as response: # Тут есть allow_redirects=true/false
-            print(f'№{counter} - {domain} выполнен за {time.time() - start_time} - со статусом {response.status}')
+            print(f'№{counter} - {domain} выполнен за {time.time() - start_time} - со статусом {response.status} и реальным url - {response.url}')
+            insert_into_db(connection, 'domains', domain, 'ru', response.url, response.status)
             # if counter % 10 == 0: print(f'№{counter} - {domain} выполнен за {time.time() - start_time} - со статусом {task.status}')
-            del response
     except Exception as e:
         print(f'№{counter} - {domain} выполнен за {time.time() - start_time} - с ошибкой {e}')
+        insert_into_db(connection, 'domains', domain, 'ru', '', 404)
+
         # if counter % 10 == 0: print(f'№{counter} - {domain} выполнен за {time.time() - start_time} - с ошибкой {e}')
     finally:
         await session.close()
 
 
-async def request_all(domains, connection):
+async def request_all(domains):
     start_time = time.time()
     requests = []
     step = 1000
 
+    connection = create_connection("localhost", "root", "password", "admin_domains")
 
     start = time.time()
     print(f'\n---------------------------------- Начал обработку запросов ----------------------------------\n')
@@ -90,26 +98,14 @@ async def request_all(domains, connection):
     print(f'---------------------------------- Обработка заняла {time.time() - start} секунд ---------------------------------- ')
 
 
-    start = time.time()
-    print(f'\n---------------------------------- Начал обработку запросов ----------------------------------\n')
-    responses = await asyncio.gather(*requests)
-    print(f'---------------------------------- {len(requests)} запросов обработано за {time.time() - start} ---------------------------------- ')
-
-
-async def insert_into_db(db_name, table_name, data):
-    pass
-
-
 def main():
     db_user = 'root'
     db_password = 'password'
     db_name = 'lemon_domains'
     table_name = 'domains'
 
-    connection = ''
-
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(request_all(get_rows_from_txt(), connection))
+    loop.run_until_complete(request_all(get_rows_from_txt()))
 
 
 if __name__ == "__main__":
