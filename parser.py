@@ -1,9 +1,25 @@
 import time
 import asyncio
 import aiohttp
-
+import mysql.connector
+from mysql.connector import Error
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning) 
+
+def create_connection(host_name, user_name, user_password, db_name):
+    connection = None
+    try:
+        connection = mysql.connector.connect(
+            host=host_name,
+            user=user_name,
+            passwd=user_password,
+            database=db_name
+        )
+        print("Connection to MySQL DB successful")
+    except Error as e:
+        print(f"The error '{e}' occurred")
+
+    return connection
 
 
 def get_headers():
@@ -34,12 +50,10 @@ def get_rows_from_txt():
     return domains_array
 
 
-async def process_domain(domain, counter):   
+async def process_domain(domain, counter, connection, start_time):   
     timeout_sec = 5
     session_timeout = aiohttp.ClientTimeout(total = None, sock_connect = timeout_sec, sock_read = timeout_sec)
     session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False), timeout=session_timeout)
-
-    start_time = time.time()
     
     try:
         # TODO: Вот тут без async with вылетали ошибки с unclosed connection
@@ -54,19 +68,27 @@ async def process_domain(domain, counter):
         await session.close()
 
 
-async def request_all(domains, limit):
-    counter = 1
+async def request_all(domains, connection):
     start_time = time.time()
     requests = []
-    limit = 10000
+    step = 1000
 
-    for domain in domains:
-        requests.append(process_domain(domain, counter))
-        if counter % 1000 == 0: print(f'Добавлена задача №{counter}')
-        if limit != 0 and counter == limit:
-            print(f'Создано {limit} задач')
-            break
-        counter += 1
+
+    start = time.time()
+    print(f'\n---------------------------------- Начал обработку запросов ----------------------------------\n')
+    for portion in range(0, len(domains) + step, step):
+        if portion - step < 0:
+            start_index = 0
+        else:
+            start_index = portion - step
+        for domain_index in range(start_index, portion):
+            requests.append(process_domain(domains[domain_index], domain_index, connection, start_time))
+            if domain_index % 10000 == 0: print(f'Добавлена задача №{domain_index}')
+        await asyncio.gather(*requests)
+        print(f'---------------------------------- Обработано ссылок с {start_index} до {portion} за {time.time() - start} ---------------------------------- ')
+        requests.clear()
+    print(f'---------------------------------- Обработка заняла {time.time() - start} секунд ---------------------------------- ')
+
 
     start = time.time()
     print(f'\n---------------------------------- Начал обработку запросов ----------------------------------\n')
@@ -79,10 +101,17 @@ async def insert_into_db(db_name, table_name, data):
 
 
 def main():
-    limit = 10000
+    db_user = 'root'
+    db_password = 'password'
+    db_name = 'lemon_domains'
+    table_name = 'domains'
+
+    connection = ''
+
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(request_all(get_rows_from_txt(), limit))
-    
+    loop.run_until_complete(request_all(get_rows_from_txt(), connection))
+
+
 if __name__ == "__main__":
     main()
     
