@@ -3,12 +3,15 @@ import axios from 'axios';
 import mysql from 'mysql2';
 import 'dotenv/config';
 import https from 'http';
+import fs from "fs";
 
 async function makeRequestAsync(domain, index) {
     let url = "http://" + domain;
 
-    axios.post(url, {
-        timeout: 3000,
+    await axios.get(url, {
+        key: fs.readFileSync('agent2-key.pem'),
+        cert: fs.readFileSync('agent2-cert.pem'),
+        timeout: 5000,
         userAgents: userAgents(),
         maxRedirects: 3,
         httpsAgent: new https.Agent({
@@ -16,8 +19,10 @@ async function makeRequestAsync(domain, index) {
         })
     }).then((response) => {
         console.log("№" + index + " " + response.config['url'] + " " + response.status);
-    }).catch((err) => {
-        console.log("№" + index + " " + url + " " + err.message);
+    }).catch(function (err) {
+        setTimeout(()=>{
+            console.log("№" + index + " " + url + " " + err.message);
+        }, 2000)
     });
 }
 
