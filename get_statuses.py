@@ -68,7 +68,6 @@ async def process_domain(domain, counter, connection, start_time):
     session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False), timeout=session_timeout)
 
     try:
-        # TODO: Вот тут без async with вылетали ошибки с unclosed connection
         async with session.get(domain, headers=get_headers()) as response: # Тут есть allow_redirects=true/false
             if counter % 10000 == 0: print(f'№{counter} - {domain} выполнен за {time.time() - start_time} - {response.status}')
             insert_into_db(connection, 'domains', domain, 'ru', response.url, response.status)
@@ -78,29 +77,25 @@ async def process_domain(domain, counter, connection, start_time):
     finally:
         await session.close()
 
-
 async def request_all(domains, db_host, db_name, db_user, db_password):
-    requests = []
+    start_index = 0
     step = 10000
+    requests = []
 
     connection = create_connection(db_host, db_name, db_user, db_password)
-
     start_time = time.time()
+
     print(f'\n---------------------------------- Начал обработку запросов ----------------------------------\n')
-    
-    # TODO: Вынести if из цикла 
-    for portion in range(0, len(domains) + step, step):
-        if portion - step < 0:
-            start_index = 0
-        else:
-            start_index = portion - step
+
+    for portion in range(0, len(domains), step):
         for domain_index in range(start_index, portion):
             requests.append(process_domain(domains[domain_index], domain_index, connection, start_time))
             if domain_index % 10000 == 0: print(f'Добавлена задача №{domain_index}')
         await asyncio.gather(*requests)
         print(f'---------------------------------- Обработано ссылок с {start_index} до {portion} за {time.time() - start_time} ---------------------------------- ')
+        start_index = portion
         requests.clear()
-    
+        
     print(f'---------------------------------- Обработка заняла {time.time() - start_time} секунд ---------------------------------- ')
 
 
@@ -112,7 +107,7 @@ def main():
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(request_all(get_rows_from_txt(), db_host, db_name, db_user, db_password))
-
+    
 
 if __name__ == "__main__":
     main()
