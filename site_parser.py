@@ -1,6 +1,8 @@
 import warnings
 import os
 import time
+
+from attr import attr
 try:
     import asyncio
 except:
@@ -59,7 +61,7 @@ def get_headers():
 
 
 async def parse_site(domain, counter):
-    timeout_sec = 10
+    timeout_sec = 0
     session_timeout = aiohttp.ClientTimeout(
         total=None, sock_connect=timeout_sec, sock_read=timeout_sec)
     session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(
@@ -101,40 +103,56 @@ async def identify_site(html):
     description = await find_description(bs4)
     cms = await identify_cms(html)
     town = await find_city(bs4) 
+    mobile_phones = await find_phones(bs4)
     
 
     print(f"Title: {title}")
     print(f"Description: {description}")
     print(f"CMS: {cms}")
-    print(f"Город: {town}\n")
+    print(f"Город: {town}")
+    print(f"Номера телефонов: {mobile_phones}\n") # Искать через <a href="tel:+123123123>+12313213</a>"
+
 
     
-    # print(f"ИНН: {INN}\n")
-    # print(f"Номера телефонов: {mobile_numbers_list}\n") # Искать через <a href="tel +123123123>+12313213</a>"
     # print(f"Список электронных почт: {emails_list}\n") # Пример <a href="mailto:100bumag@100bumag.ru">100bumag@100bumag.ru </a>
+    # print(f"ИНН: {INN}\n")
     # print(f"Категория: {category}\n")
     # print(f"Подкатегория: {subcategory}\n")
-    
+async def find_phones(bs4):
+    links = bs4.findAll('a')
+    mobile_numbers = []
+    for a in links:
+        for attribute in a.attrs:
+            if attribute == 'href' and 'tel:' in a[attribute]:
+                mobile_number = a.contents[0].replace('\n', '').strip()
+                mobile_numbers.append(mobile_number)
+    return list(set(mobile_numbers)) # Так удаляю дубликаты
 
 
 async def find_description(bs4):
     description = ''
     meta_tags = bs4.findAll('meta')
-    for tag in meta_tags:
-        for attribute in tag.attrs:
-            if 'description' in tag[attribute]:
-                description = tag['content'].strip()
+    for meta in meta_tags:
+        for attribute in meta.attrs:
+            if 'description' in meta[attribute]:
+                description = meta['content'].strip()
                 return description
+    return ''
 
 
 async def find_city(bs4):
-    # Вот такой класс видел "sp-contact-time"
+    # В таком тэги с нужной информацией class="sp-contact-info" 
+    # Есть тэг с картой и меткой <ymaps
     keywords = ['contact', 'address', 'city', 'town', 'street', 'country', 'location', 'located']
-    for keyword in keywords:
-        if keyword in bs4:
-            return 'SCHEMA_IS_HERE - SCHEMA_IS_HERE - SCHEMA_IS_HERE'
+    tags = bs4.findAll()
 
-
+    itemprop_spans_list = []
+    for span in tags:
+        for attribute in span.attrs:
+            # if 'itemprop' == attribute:
+            if 'itemprop' in attribute: #<span itemprop=addressLocality
+                itemprop_spans_list.append(span)
+    return itemprop_spans_list
 
 
 async def identify_cms(html):
