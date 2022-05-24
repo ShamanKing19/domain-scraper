@@ -2,7 +2,6 @@ import warnings
 import os
 import time
 
-from attr import attr
 try:
     import asyncio
 except:
@@ -60,8 +59,8 @@ def get_headers():
     return user_agents
 
 
-async def parse_site(domain, counter):
-    timeout_sec = 0
+async def parse_site(domain, counter, start_time):
+    timeout_sec = 30
     session_timeout = aiohttp.ClientTimeout(
         total=None, sock_connect=timeout_sec, sock_read=timeout_sec)
     session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(
@@ -73,7 +72,7 @@ async def parse_site(domain, counter):
             html = await response.text()
 
             print(
-                f"№{counter} -----------------------------------------------------")
+                f"№{counter} - {time.time() - start_time} ----------------------------------------------------")
             print(f"URL: {url}")
             await identify_site(html)
             counter += 1
@@ -86,71 +85,81 @@ async def parse_site(domain, counter):
 def select_from_db(connection):
     with connection.cursor() as cursor:
         sql = "SELECT real_domain FROM domains WHERE status=200"
-        # sql = "SELECT real_domain FROM domains WHERE status=200 LIMIT 1000 OFFSET 3000"
+        # sql = "SELECT real_domain FROM domains WHERE status=200 LIMIT 10000"
         cursor.execute(sql)
         result = cursor.fetchall()
         return result
 
 
+# Вот этот сайт надо проверить, (он отмечается как valid: True, 'nonetype' onject is not callable): №1300 http://0kno-plastikovoe.ru/#rec405386570
 async def identify_site(html):
     bs4 = BeautifulSoup(html, "lxml")
-    # TODO: Тут можно сразу скипать сайты если в них есть слова [reg.ru, купить домен, ...]
-
     valid = await check_valid(html)
-    print(f"Valid: {valid}")
-    if not valid: return 
-    title = bs4.title.contents[0].strip()
+    if valid:
+        print(f"Valid: {valid}")
+    if not valid:
+        return
+    # TODO: Проверить что будет быстрее: каждый раз проверять на наличие тэга или просто ловить исключение
+    title = await find_title(bs4)
     description = await find_description(bs4)
     cms = await identify_cms(html)
-    town = await find_city(bs4) 
-    mobile_phones = await find_phones(bs4)
-    
+    contacts = await find_contacts(bs4)
+    town = await find_city(bs4)
 
     print(f"Title: {title}")
     print(f"Description: {description}")
     print(f"CMS: {cms}")
-    print(f"Город: {town}")
-    print(f"Номера телефонов: {mobile_phones}\n") # Искать через <a href="tel:+123123123>+12313213</a>"
+    # Искать через <a href="tel:+123123123>+12313213</a>"
+    print(f"Контакты: {contacts}\n")
+    # print(f"Город: {town}")
 
-
-    
     # print(f"Список электронных почт: {emails_list}\n") # Пример <a href="mailto:100bumag@100bumag.ru">100bumag@100bumag.ru </a>
     # print(f"ИНН: {INN}\n")
     # print(f"Категория: {category}\n")
     # print(f"Подкатегория: {subcategory}\n")
-async def find_phones(bs4):
+
+
+# TODO: Проверить скорость с более точным поиском
+# Находить контакты можно чаще, но медленнее
+# можно искать все классы, в которых будет phone, contacts
+#
+async def find_contacts(bs4):
     links = bs4.findAll('a')
     mobile_numbers = []
+    emails = []
     for a in links:
         for attribute in a.attrs:
-            if attribute == 'href' and 'tel:' in a[attribute]:
-                mobile_number = a.contents[0].replace('\n', '').strip()
-                mobile_numbers.append(mobile_number)
-    return list(set(mobile_numbers)) # Так удаляю дубликаты
-
-
-async def find_description(bs4):
-    description = ''
-    meta_tags = bs4.findAll('meta')
-    for meta in meta_tags:
-        for attribute in meta.attrs:
-            if 'description' in meta[attribute]:
-                description = meta['content'].strip()
-                return description
-    return ''
+            if attribute == 'href':
+                if 'tel:' in a[attribute]:
+                    # mobile_number = a.contents[0].replace('\n', '').strip()
+                    # TODO: Убрать все символы кроме цифр
+                    mobile_number = a[attribute].split(':')[-1]
+                    mobile_numbers.append(mobile_number)
+                elif 'mailto:' in a[attribute]:
+                    # email = a.contents[0].replace('\n', '').strip()
+                    email = a[attribute].split(':')[-1]
+                    emails.append(email)
+    # Так удаляю дубликаты
+    return {'mobile_numbers': list(set(mobile_numbers)), 'emails:': list(set(emails))}
 
 
 async def find_city(bs4):
-    # В таком тэги с нужной информацией class="sp-contact-info" 
+    # В таком тэги с нужной информацией class="sp-contact-info"
     # Есть тэг с картой и меткой <ymaps
-    keywords = ['contact', 'address', 'city', 'town', 'street', 'country', 'location', 'located']
+    # Видел <div class="address"
+    # <iframe src="https://www.google.com/maps..."
+
+    tag_keywords = ['contact', 'address', 'city', 'town',
+                    'street', 'country', 'location', 'located']
+    
+    keywords = ['г. ', 'гор. ', 'город ', 'ул. ', 'улица ']
     tags = bs4.findAll()
 
     itemprop_spans_list = []
     for span in tags:
         for attribute in span.attrs:
             # if 'itemprop' == attribute:
-            if 'itemprop' in attribute: #<span itemprop=addressLocality
+            if 'itemprop' in attribute:  # <span itemprop=addressLocality
                 itemprop_spans_list.append(span)
     return itemprop_spans_list
 
@@ -176,11 +185,36 @@ async def identify_cms(html):
 
 async def check_valid(html):
     valid = True
-    invalid_keywords = ['reg.ru', 'домен', 'купи домен', 'купить домен', 'приобрести домен', 'приобрети домен', 'получить домен', 'получи домен', 'домен продаётся', 'domain for sale', 'домен продается', 'домен продаётся', 'домен недоступен', 'домен временно недоступен']
+    invalid_keywords = ['reg.ru', 'линковка', 'купить домен', 'домен припаркован', 'только что создан', 'сайт создан', 'приобрести домен',
+                        'получить домен', 'получи домен', 'домен продаётся', 'domain for sale', 'домен продается', 'домен продаётся',
+                        'домен недоступен', 'домен временно недоступен', 'вы владелец сайта?', 'технические работы', 'сайт отключен', 'сайт заблокирован',
+                        'сайт недоступен', 'это тестовый сервер', 'это тестовый сайт', 'срок регистрации', 'the site is',
+                        '503 service', '404 not found', 'fatal error', 'настройте домен', 'under construction',  'не опубликован',
+                        'домен зарегистрирован', 'доступ ограничен', 'Welcome to nginx', 'owner of this ']
     for keyword in invalid_keywords:
-        if keyword in html:
+        if keyword in html.lower():
+            print(f'Invalid cuz of: {keyword}\n')
             return False
     return valid
+
+
+async def find_description(bs4):
+    description = ''
+    meta_tags = bs4.findAll('meta')
+    for meta in meta_tags:
+        for attribute in meta.attrs:
+            if 'description' in meta[attribute]:
+                description = meta['content'].strip()
+                return description
+    return ''
+
+
+async def find_title(bs4):
+    title = ''
+    titles = bs4.findAll('title')
+    for title in titles:
+        return title.get_text().replace('\n', '').strip()
+    return title
 
 
 async def parse_all_sites(domains):
@@ -189,17 +223,20 @@ async def parse_all_sites(domains):
     step = 10000
     requests = []
     start_time = time.time()
-    
+
     print(f"Парсинг начался")
-    
+
     for portion in range(start_index, len(domains), step):
         for domain_index in range(start_index, portion):
-            requests.append(parse_site(domains[domain_index]["real_domain"], counter))
+            requests.append(parse_site(
+                domains[domain_index]["real_domain"], counter, start_time))
             counter += 1
         await asyncio.gather(*requests)
+        requests.clear()
         start_index = portion
-    
-    print(f"Парсинг {counter-1} сайтов закончился за {time.time() - start_time}")
+
+    print(
+        f"Парсинг {counter-1} сайтов закончился за {time.time() - start_time}")
 
 
 def main():
