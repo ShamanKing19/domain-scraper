@@ -113,7 +113,7 @@ async def parse_site(domain, counter, categories, regions, start_time):
 
             print(f"№{counter} - {time.time() - start_time} ----------------------------------------------------")
             print(f"URL: {url}")
-            await identify_site(html, categories, regions)
+            await identify_site(html, categories, regions, counter)
             counter += 1
     except Exception as error:
         print(error)
@@ -121,14 +121,15 @@ async def parse_site(domain, counter, categories, regions, start_time):
         await session.close()
 
 
-async def identify_site(html, categories, regions):
+async def identify_site(html, categories, regions, index):
     bs4 = BeautifulSoup(html, "lxml")
+    
     valid = await check_valid(bs4)
     if valid:
         print(f"Valid: {valid}")
     if not valid:
         return
-    # TODO: Проверить что будет быстрее: каждый раз проверять на наличие тэга или просто ловить исключение
+
     title = await find_title(bs4) # Возврат: string
     description = await find_description(bs4) # Возврат: string
     cms = await identify_cms(bs4) # Возврат: string
@@ -145,8 +146,8 @@ async def identify_site(html, categories, regions):
     print(f"ИНН: {inn}")
     print(f"Категория: {category}")
     print(f"Города через номер: {cities_via_number}")
-    print(f"Города через ИНН: {cities_via_inn}\n")
-
+    print(f"Города через ИНН: {cities_via_inn}")
+    print(f"Индекс: {index}\n")
 
 # TODO: Переделать под поиск слов в тексте
 async def identify_category(title, description, raw_categories):
@@ -184,7 +185,6 @@ async def get_categories_dict(raw_categories):
     return tags_dict
 
 
-# TODO: Сделать это через таблицу, а не через файл
 async def identify_city_by_inn(inns, regions):
     # print(regions)
     result_regions = []
@@ -207,7 +207,7 @@ async def identify_city_by_number(numbers):
     
 
 async def find_inn(text):
-    # TODO: Отсечь личшние символы вначеле и в конце, потому что схватывает рандомные числа из ссылок
+    # TODO: Отсечь личшние символы вначале и в конце, потому что схватывает рандомные числа из ссылок
     ideal_pattern = re.compile('\b\d{4}\d{6}\d{2}\\b|\\b\d{4}\d{5}\d{1}\\b')
     all_inns = list(set(re.findall(ideal_pattern, text)))
     correct_inns = []
@@ -245,11 +245,10 @@ async def find_inn(text):
                 correct_inns.append(inn)
     return correct_inns
 
+
 # TODO: Проверить скорость с более точным поиском
 # Находить контакты можно чаще, но медленнее
 # можно искать все классы, в которых будет phone, contacts
-
-
 async def find_contacts(bs4):
     links = bs4.findAll('a')
     mobile_numbers = []
@@ -258,7 +257,6 @@ async def find_contacts(bs4):
         for attribute in a.attrs:
             if attribute == 'href':
                 if 'tel:' in a[attribute]:
-                    # TODO: Убрать все символы кроме цифр
                     mobile_number = a[attribute].split(':')[-1].strip()
                     s1 = re.sub("[^A-Za-z0-9]", "", mobile_number)
                     mobile_numbers.append(s1)
