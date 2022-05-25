@@ -1,6 +1,10 @@
 import warnings
 import os
 import time
+import re
+import json
+
+from requests import head
 
 try:
     import asyncio
@@ -91,10 +95,9 @@ def select_from_db(connection):
         return result
 
 
-# Вот этот сайт надо проверить, (он отмечается как valid: True, 'nonetype' onject is not callable): №1300 http://0kno-plastikovoe.ru/#rec405386570
 async def identify_site(html):
     bs4 = BeautifulSoup(html, "lxml")
-    valid = await check_valid(html)
+    valid = await check_valid(bs4)
     if valid:
         print(f"Valid: {valid}")
     if not valid:
@@ -102,27 +105,63 @@ async def identify_site(html):
     # TODO: Проверить что будет быстрее: каждый раз проверять на наличие тэга или просто ловить исключение
     title = await find_title(bs4)
     description = await find_description(bs4)
-    cms = await identify_cms(html)
+    cms = await identify_cms(bs4)
     contacts = await find_contacts(bs4)
-    town = await find_city(bs4)
+    inn = await find_inn(bs4.text)
+    # cities = await find_cities(contacts['mobile_phones']) # не успевает схватывать и выводить номер
 
     print(f"Title: {title}")
     print(f"Description: {description}")
     print(f"CMS: {cms}")
-    # Искать через <a href="tel:+123123123>+12313213</a>"
-    print(f"Контакты: {contacts}\n")
-    # print(f"Город: {town}")
+    print(f"Контакты: {contacts}")
+    print(f"ИНН: {inn}\n")
+    # print(f"Город: {cities}\n")
 
-    # print(f"Список электронных почт: {emails_list}\n") # Пример <a href="mailto:100bumag@100bumag.ru">100bumag@100bumag.ru </a>
-    # print(f"ИНН: {INN}\n")
     # print(f"Категория: {category}\n")
     # print(f"Подкатегория: {subcategory}\n")
 
+async def find_inn(text):
+    # TODO: Отсечь личшние символы вначеле и в конце, потому что схватывает рандомные числа из ссылок
+    ideal_pattern = re.compile('\b\d{4}\d{6}\d{2}\\b|\\b\d{4}\d{5}\d{1}\\b')
+    all_inns = list(set(re.findall(ideal_pattern, text)))
+    correct_inns = []
+
+    coefficients_10 = [2, 4, 10, 3, 5, 9, 4, 6, 8, 0]
+    coefficients_12_1 = [7, 2, 4, 10, 3, 5, 9, 4, 6, 8, 0, 0]
+    coefficients_12_2 = [3, 7, 2, 4, 10, 3, 5, 9, 4, 6, 8, 0]
+    
+    # Тут должны быть формулы проверки корректности ИНН
+    for inn in all_inns:
+        if len(inn) == 10:
+            key = 0
+            # Расчёт ключа по коэффициентам
+            for i, digit in enumerate(inn, start=0):
+                key += int(digit) * coefficients_10[i]
+            # key mod 11
+            key_value = key - (key // 11) * 11
+            if key_value == int(inn[-1]):
+                correct_inns.append(inn)
+        
+        elif len(inn) == 12:
+            key1 = 0
+            key2 = 0
+            # Расчёт ключа №1 по коэффициентам
+            for i, digit in enumerate(inn, start=0):
+                key1 += int(digit) * coefficients_12_1[i]
+            # key mod 11 №1
+            key_value1 = key1 - (key1 // 11) * 11
+            # Расчёт ключа №2 по коэффициентам
+            for i, digit in enumerate(inn, start=0):
+                key2 += int(digit) * coefficients_12_2[i]
+            key_value2 = key2 - (key2 // 11) * 11
+            # key mod 11 №2
+            if key_value1 == int(inn[10]) and key_value2 == int(inn[11]):
+                correct_inns.append(inn)
+    return correct_inns
 
 # TODO: Проверить скорость с более точным поиском
 # Находить контакты можно чаще, но медленнее
 # можно искать все классы, в которых будет phone, contacts
-#
 async def find_contacts(bs4):
     links = bs4.findAll('a')
     mobile_numbers = []
@@ -131,37 +170,15 @@ async def find_contacts(bs4):
         for attribute in a.attrs:
             if attribute == 'href':
                 if 'tel:' in a[attribute]:
-                    # mobile_number = a.contents[0].replace('\n', '').strip()
                     # TODO: Убрать все символы кроме цифр
-                    mobile_number = a[attribute].split(':')[-1]
-                    mobile_numbers.append(mobile_number)
+                    mobile_number = a[attribute].split(':')[-1].strip()
+                    s1 = re.sub("[^A-Za-z0-9]", "", mobile_number)
+                    mobile_numbers.append(s1)
                 elif 'mailto:' in a[attribute]:
-                    # email = a.contents[0].replace('\n', '').strip()
-                    email = a[attribute].split(':')[-1]
+                    email = a[attribute].split(':')[-1].strip()
                     emails.append(email)
     # Так удаляю дубликаты
     return {'mobile_numbers': list(set(mobile_numbers)), 'emails:': list(set(emails))}
-
-
-async def find_city(bs4):
-    # В таком тэги с нужной информацией class="sp-contact-info"
-    # Есть тэг с картой и меткой <ymaps
-    # Видел <div class="address"
-    # <iframe src="https://www.google.com/maps..."
-
-    tag_keywords = ['contact', 'address', 'city', 'town',
-                    'street', 'country', 'location', 'located']
-    
-    keywords = ['г. ', 'гор. ', 'город ', 'ул. ', 'улица ']
-    tags = bs4.findAll()
-
-    itemprop_spans_list = []
-    for span in tags:
-        for attribute in span.attrs:
-            # if 'itemprop' == attribute:
-            if 'itemprop' in attribute:  # <span itemprop=addressLocality
-                itemprop_spans_list.append(span)
-    return itemprop_spans_list
 
 
 async def identify_cms(html):
@@ -183,7 +200,8 @@ async def identify_cms(html):
             return cms_keywords[keyword]
 
 
-async def check_valid(html):
+async def check_valid(bs4):
+    text = bs4.text
     valid = True
     invalid_keywords = ['reg.ru', 'линковка', 'купить домен', 'домен припаркован', 'только что создан', 'сайт создан', 'приобрести домен',
                         'получить домен', 'получи домен', 'домен продаётся', 'domain for sale', 'домен продается', 'домен продаётся',
@@ -192,7 +210,7 @@ async def check_valid(html):
                         '503 service', '404 not found', 'fatal error', 'настройте домен', 'under construction',  'не опубликован',
                         'домен зарегистрирован', 'доступ ограничен', 'Welcome to nginx', 'owner of this ']
     for keyword in invalid_keywords:
-        if keyword in html.lower():
+        if keyword in text.lower():
             print(f'Invalid cuz of: {keyword}\n')
             return False
     return valid
@@ -218,6 +236,10 @@ async def find_title(bs4):
 
 
 async def parse_all_sites(domains):
+    # test_numbers = [79184251015, 79278921675, 89118535474]
+    # for number in test_numbers:
+    #     print(await check_phone(number))
+    
     counter = 1
     start_index = 0
     step = 10000
