@@ -3,6 +3,7 @@ import os
 import time
 import re
 import json
+import csv
 try:
     import asyncio
 except:
@@ -75,6 +76,16 @@ def select_categories_from_db(connection):
         return result
 
 
+def select_regions_from_db(connection):
+    with connection.cursor() as cursor:
+        sql = """
+                SELECT * FROM regions
+            """
+        cursor.execute(sql)
+        result = cursor.fetchall()
+        return result
+
+
 def get_headers():
     user_agents = {
         'User-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36',
@@ -89,7 +100,7 @@ def get_headers():
     return user_agents
 
 
-async def parse_site(domain, counter, categories, start_time):
+async def parse_site(domain, counter, categories, regions, start_time):
     timeout_sec = 30
     session_timeout = aiohttp.ClientTimeout(
         total=None, sock_connect=timeout_sec, sock_read=timeout_sec)
@@ -98,13 +109,11 @@ async def parse_site(domain, counter, categories, start_time):
     try:
         async with session.get(domain, headers=get_headers()) as response:
             url = response.url
-            headers = response.headers
             html = await response.text()
 
-            print(
-                f"№{counter} - {time.time() - start_time} ----------------------------------------------------")
+            print(f"№{counter} - {time.time() - start_time} ----------------------------------------------------")
             print(f"URL: {url}")
-            await identify_site(html, categories)
+            await identify_site(html, categories, regions)
             counter += 1
     except Exception as error:
         print(error)
@@ -112,7 +121,7 @@ async def parse_site(domain, counter, categories, start_time):
         await session.close()
 
 
-async def identify_site(html, categories):
+async def identify_site(html, categories, regions):
     bs4 = BeautifulSoup(html, "lxml")
     valid = await check_valid(bs4)
     if valid:
@@ -120,13 +129,14 @@ async def identify_site(html, categories):
     if not valid:
         return
     # TODO: Проверить что будет быстрее: каждый раз проверять на наличие тэга или просто ловить исключение
-    title = await find_title(bs4)
-    description = await find_description(bs4)
-    cms = await identify_cms(bs4)
-    contacts = await find_contacts(bs4)
-    inn = await find_inn(bs4.text)
-    category = await identify_category(title, description, categories)
-    cities = await identify_city(contacts['mobile_numbers']) # не успевает схватывать и выводить номер
+    title = await find_title(bs4) # Возврат: string
+    description = await find_description(bs4) # Возврат: string
+    cms = await identify_cms(bs4) # Возврат: string
+    contacts = await find_contacts(bs4) # Возврат: {'mobile_numbers': [], 'emails:': []}
+    inn = await find_inn(bs4.text) # Возврат: ['ИНН1', 'ИНН2', ...]
+    category = await identify_category(title, description, categories) # Возврат: {'category': 'Предоставление прочих видов услуг', 'subcategory': 'Предоставление прочих персональных услуг'}
+    cities_via_number = await identify_city_by_number(contacts['mobile_numbers']) # Возврат: ['Город1', 'Город2', ...]
+    cities_via_inn = await identify_city_by_inn(inn, regions) # Возврат:
 
     print(f"Title: {title}")
     print(f"Description: {description}")
@@ -134,9 +144,11 @@ async def identify_site(html, categories):
     print(f"Контакты: {contacts}")
     print(f"ИНН: {inn}")
     print(f"Категория: {category}")
-    print(f"Город: {cities}\n")
+    print(f"Города через номер: {cities_via_number}")
+    print(f"Города через ИНН: {cities_via_inn}\n")
 
 
+# TODO: Переделать под поиск слов в тексте
 async def identify_category(title, description, raw_categories):
     categories = await get_categories_dict(raw_categories)
     for category in categories:
@@ -172,7 +184,17 @@ async def get_categories_dict(raw_categories):
     return tags_dict
 
 
-async def identify_city(numbers):
+# TODO: Сделать это через таблицу, а не через файл
+async def identify_city_by_inn(inns, regions):
+    # print(regions)
+    result_regions = []
+    for inn in inns:
+        for region in regions:
+            if int(inn[:2]) == region['id']:
+                result_regions.append(region['region'].strip())
+    return result_regions
+
+async def identify_city_by_number(numbers):
     cities = []
     for number in numbers:
         valid_number = phonenumbers.parse(number, "RU")
@@ -308,19 +330,19 @@ async def parse_all_sites(domains, connection):
     start_time = time.time()
 
     categories = select_categories_from_db(connection)
+    regions_by_inn = select_regions_from_db(connection)
 
     print(f"Парсинг начался")
 
     for portion in range(start_index, len(domains), step):
         for domain_index in range(start_index, portion):
             requests.append(parse_site(
-                domains[domain_index]["real_domain"], domain_index+1, categories,  start_time))
+                domains[domain_index]["real_domain"], domain_index+1, categories, regions_by_inn,  start_time))
         await asyncio.gather(*requests)
         requests.clear()
         start_index = portion
 
-    print(
-        f"Парсинг {domain_index+1} сайтов закончился за {time.time() - start_time}")
+    print(f"Парсинг {domain_index+1} сайтов закончился за {time.time() - start_time}")
 
 
 def main():
