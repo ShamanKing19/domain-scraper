@@ -2,6 +2,7 @@ from genericpath import exists
 import os, time
 from urllib.request import urlretrieve
 import zipfile
+import urllib
 try:
     import asyncio
 except:
@@ -18,8 +19,6 @@ try:
     from dotenv import load_dotenv
 except:
     os.system("pip install python-dotenv")
-from zipfile import ZipFile
-import urllib
 
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 if os.path.exists(dotenv_path):
@@ -44,20 +43,20 @@ class StatusParser:
 
         self.connection = self.__create_connection()
         self.table_name = db_table_name
-
+        
         # Можно разбить на connection и readtimeout
         self.timeout = 5
         self.step = 10000
         # Будет выводиться каждая запись кратная этому числу
         self.every_printable = 10
 
-        self.domains = []
+        self.domains = self.__get_rows_from_txt()
+        
 
 
     def parse_statuses(self):
         self.__create_table_if_not_exists()
         self.__download_ru_domains_file_if_not_exists()
-        self.domains = self.__get_rows_from_txt()
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self.__request_all())
 
@@ -89,7 +88,7 @@ class StatusParser:
                 );
             """
         self.__make_db_request(sql)
-        print(f"Таблица {self.table_name} создана в базе {self.db_name}")
+        # print(f"Таблица {self.table_name} создана в базе {self.db_name}")
 
 
     def __get_headers(self):
@@ -115,6 +114,14 @@ class StatusParser:
         with self.connection.cursor() as cursor:
             cursor.execute(sql)
         self.connection.commit()
+
+
+    def __get_number_of_existing_rows(self):
+        with self.connection.cursor() as cursor:
+            cursor.execute(f"SELECT * FROM {self.table_name}")
+            result = cursor.fetchall()
+        self.connection.commit()
+        return len(result)
 
 
     def __get_rows_from_txt(self):
@@ -146,14 +153,13 @@ class StatusParser:
 
 
     async def __request_all(self):
-        start_index = 0
+        start_index = self.__get_number_of_existing_rows()
         step = 10000
         requests = []
         start_time = time.time()
 
         print(f'\n---------------------------------- Начал обработку запросов ----------------------------------\n')
-
-        for portion in range(0, len(self.domains), step):
+        for portion in range(start_index, len(self.domains), step):
             for domain_index in range(start_index, portion):
                 requests.append(self.__process_domain(self.domains[domain_index], self.zone, domain_index, start_time))
                 if domain_index % 10000 == 0: print(f'Добавлена задача №{domain_index}')
