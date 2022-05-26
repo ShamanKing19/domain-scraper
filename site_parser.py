@@ -50,6 +50,7 @@ class Site_parser:
         self.db_password = db_password
 
         self.timeout_sec = 30
+        self.step = 10000
 
         self.connection = self.__create_connection()
 
@@ -63,13 +64,13 @@ class Site_parser:
         self.__create_tables()
         
         # Получение инфы для парсинга
-        self.domains = self.__make_db_request("SELECT real_domain FROM domains WHERE status=200")
+        self.domains = self.__make_db_request("SELECT id, real_domain FROM domains WHERE status=200 GROUP BY real_domain")
         self.categories = self.__make_db_request("""
                     SELECT category.name, subcategory.name, tags.tag FROM category
                     RIGHT JOIN subcategory ON category.id = subcategory.category_id
                     INNER JOIN tags ON subcategory.id = tags.id
                 """)
-        self.regions_by_inn = self.__make_db_request("""
+        self.regions = self.__make_db_request("""
                     SELECT * FROM regions
                 """)
 
@@ -83,13 +84,15 @@ class Site_parser:
         # domain_info TABLE creation
         self.__make_db_request(f"""
                 CREATE TABLE IF NOT EXISTS {self.domain_info_table_name} (
-                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    id INT PRIMARY KEY,
                     domain_id INT, 
                     title VARCHAR(255), 
                     description VARCHAR(255), 
                     city VARCHAR(255), 
                     inn VARCHAR(255), 
                     cms VARCHAR(100),
+                    status BOOL,
+                    comment VARCHAR(500),
                     FOREIGN KEY (domain_id) REFERENCES {self.statuses_table_name} (Id)
                 );
             """)
@@ -173,74 +176,101 @@ class Site_parser:
             result = cursor.fetchall()
             return result
 
+    def __make_db_insert(self, sql):
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql)
+        self.connection.commit()
+
 
     async def __parse_all_sites(self):
         start_index = 0
-        step = 10000
         requests = []
         start_time = time.time()
+        domains_count = len(self.domains)
 
-        print(f"Парсинг начался")
+        # TODO: Починить
+        print(f"Получено {domains_count} уникальных доменов, шаг = {self.step}")
+        # TODO: Прогоняется всего 10к записей (в первом парсере будет такая же ошибка под конец парсинга)
+        # Беда происходит из-за того, что на втором шаге start_index = 10000, а доменов всего 14600 и шаг 10000
+        # 
+        # Без try, catch этого спарсилось 4600 строк
+        for portion in range(start_index, domains_count, self.step):
+            
+            #if domains_count + self.step > 0: self.step = domains_count-start_index
 
-        for portion in range(start_index, len(self.domains), step):
             for domain_index in range(start_index, portion):
-                requests.append(self.__parse_site(
-                    self.domains[domain_index]["real_domain"], domain_index+1, start_time))
+                requests.append(self.__parse_site(self.domains[domain_index]["real_domain"], self.domains[domain_index]["id"], domain_index+1, start_time))
+            
             await asyncio.gather(*requests)
-            requests.clear()
             start_index = portion
+            requests.clear()
+        
+        # print(f"Парсинг {domain_index+1} сайтов закончился за {time.time() - start_time}")
 
-        print(
-            f"Парсинг {domain_index+1} сайтов закончился за {time.time() - start_time}")
 
 
-    async def __parse_site(self, domain, counter, start_time):
+    async def __parse_site(self, domain, domain_id, counter, start_time):
         session_timeout = aiohttp.ClientTimeout(
             total=None, sock_connect=self.timeout_sec, sock_read=self.timeout_sec)
-        session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(
-            verify_ssl=False), timeout=session_timeout)
+        session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False), timeout=session_timeout)
         try:
             async with session.get(domain, headers=self.__get_headers()) as response:
                 url = response.url
-                html = await response.text()
-
-                print(
-                    f"№{counter} - {time.time() - start_time} ----------------------------------------------------")
-                print(f"URL: {url}")
-                await self.__identify_site(html, counter)
+                html = await response.text() # TODO: Возможно ошибка кодировки здесь и надо использовать content
+                # print(f"№{counter} - {time.time() - start_time} - URL: {url}")
+                await self.__identify_site(html, domain_id)
                 counter += 1
+        # Даже к сайтам со статусом 200 парсер можен не подключиться, поэтому тут обработка
         except Exception as error:
+            print(f"№{counter} - {time.time() - start_time} - URL: {domain}")
             print(error)
         finally:
             await session.close()
 
 
-    async def __identify_site(self, html, index):
+    async def __identify_site(self, html, domain_id):
+        # TODO: Исправить проблему с кодировкой (нужно сделать кодировку utf8 для html)
         bs4 = BeautifulSoup(html, "lxml")
 
         valid = await self.__check_valid(bs4)
-        if valid:
-            print(f"Valid: {valid}")
         if not valid:
             return
 
         title = await self.__find_title(bs4)  # Возврат: string
         description = await self.__find_description(bs4)  # Возврат: string
-        cms = await self.__identify_cms(bs4)  # Возврат: string
+        cms = await self.__identify_cms(html)  # Возврат: string
         contacts = await self.__find_contacts(bs4) # Возврат: {'mobile_numbers': [], 'emails:': []}
-        inn = await self.__find_inn(bs4.text)  # Возврат: ['ИНН1', 'ИНН2', ...]
+        inns = await self.__find_inn(bs4.text)  # Возврат: ['ИНН1', 'ИНН2', ...]
         category = await self.__identify_category(title, description) # Возврат: {'category': 'Предоставление прочих видов услуг', 'subcategory': 'Предоставление прочих персональных услуг'}
         cities_via_number = await self.__identify_city_by_number(contacts['mobile_numbers']) # Возврат: ['Город1', 'Город2', ...]
-        cities_via_inn = await self.__identify_city_by_inn(inn) # Возврат: ['Москва', 'Калининградская область', 'Архангельская область'...]
+        cities_via_inn = await self.__identify_city_by_inn(inns) # Возврат: ['Москва', 'Калининградская область', 'Архангельская область'...]
+        # Тут можно попробовать убрать проверку, может быть оно не сломается
+        if len(cities_via_inn) > 0:
+            city = ",".join(cities_via_inn)
+        elif len(cities_via_number) > 0:
+            city = ",".join(cities_via_number)
+        else:
+            city = ""
+        inn = ",".join(inns)
 
-        print(f"Title: {title}")
-        print(f"Description: {description}")
-        print(f"CMS: {cms}")
-        print(f"Контакты: {contacts}")
-        print(f"ИНН: {inn}")
-        print(f"Категория: {category}")
-        print(f"Города через номер: {cities_via_number}")
-        print(f"Города через ИНН: {cities_via_inn}\n")
+
+    
+        self.__make_db_insert(f"""
+                    INSERT IGNORE INTO {self.domain_info_table_name} (id, domain_id, title, description, city, inn, cms) 
+                    VALUE ({domain_id}, {domain_id}, '{title}', '{description}', '{city}', '{inn}', '{cms}')
+                """)
+
+        # print(f"Title: {title}")
+        # print(f"Description: {description}")
+        # print(f"CMS: {cms}")
+        # print(f"Контакты: {contacts}")
+        # print(f"ИНН: {inns}\n")
+        # print(f"Категория: {category}")
+        # print(f"Города через номер: {cities_via_number}")
+        # print(f"Города через ИНН: {cities_via_inn}\n")
+
+
+        
 
     # TODO: Переделать под поиск слов в тексте
     async def __identify_category(self, title, description):
@@ -279,7 +309,6 @@ class Site_parser:
 
 
     async def __identify_city_by_inn(self, inns):
-        # print(regions)
         result_regions = []
         for inn in inns:
             for region in self.regions:
@@ -290,12 +319,17 @@ class Site_parser:
 
     async def __identify_city_by_number(self, numbers):
         cities = []
-        for number in numbers:
-            valid_number = phonenumbers.parse(number, "RU")
-            location = geocoder.description_for_number(valid_number, "ru")
-            operator = carrier.name_for_number(valid_number, "en")
-            cities.append(location)
-        return list(set(cities))
+        # TODO: Проверить ошибки
+        try:
+            for number in numbers:
+                valid_number = phonenumbers.parse(number, "RU")
+                location = geocoder.description_for_number(valid_number, "ru")
+                operator = carrier.name_for_number(valid_number, "en")
+                cities.append(location)
+        except:
+            print(numbers)
+        finally:
+            return list(set(cities))
 
 
     async def __find_inn(self, text):
@@ -336,13 +370,15 @@ class Site_parser:
                 if key_value1 == int(inn[10]) and key_value2 == int(inn[11]):
                     correct_inns.append(inn)
         if len(correct_inns) > 0:
-            return correct_inns[0]
+            return correct_inns
         else:
-            return ''
+            return []
 
 
     # TODO: Проверить скорость с более точным поиском
-    # Находить контакты можно чаще, но медленнее
+    # TODO: Может выдать в такую строку ['74955427679brbr79169573046']
+    # Такое тоже выдало ['79313526492', 'Email', '88313355101', '79200520290', '79253136201']
+    # ['882002010120000020000']
     # можно искать все классы, в которых будет phone, contacts
     async def __find_contacts(self, bs4):
         links = bs4.findAll('a')
@@ -352,12 +388,12 @@ class Site_parser:
             for attribute in a.attrs:
                 if attribute == 'href':
                     if 'tel:' in a[attribute]:
-                        mobile_number = a[attribute].split(':')[-1].strip()
-                        s1 = re.sub("[^A-Za-z0-9]", "", mobile_number)
-                        mobile_numbers.append(s1)
+                        mobile_number = a[attribute].split(':')[1].strip()
+                        number = re.sub("[^A-Za-z0-9]", "", mobile_number)
+                        if len(number) > 0: mobile_numbers.append(number)
                     elif 'mailto:' in a[attribute]:
                         email = a[attribute].split(':')[-1].strip()
-                        emails.append(email)
+                        if len(email) > 0: emails.append(email)
         # Так удаляю дубликаты
         return {'mobile_numbers': list(set(mobile_numbers)), 'emails:': list(set(emails))}
 
@@ -379,6 +415,7 @@ class Site_parser:
         for keyword in cms_keywords:
             if keyword in html:
                 return cms_keywords[keyword]
+        return "" 
 
 
     async def __check_valid(self, bs4):
@@ -392,18 +429,18 @@ class Site_parser:
                             'домен зарегистрирован', 'доступ ограничен', 'welcome to nginx', 'owner of this ']
         for keyword in invalid_keywords:
             if keyword in text.lower():
-                print(f'Invalid cuz of: {keyword}\n')
+                # print(f'Invalid cuz of: {keyword}\n')
                 return False
         return valid
 
-
+    # Описание ещё могут засунуть в <meta name="keywords" content"тут писание" ...>
     async def __find_description(self, bs4):
         description = ''
         meta_tags = bs4.findAll('meta')
         for meta in meta_tags:
             for attribute in meta.attrs:
                 if 'description' in meta[attribute]:
-                    description = meta['content'].strip()
+                    description = meta['content'].replace('\n', '').replace('"', '').replace("'", '').strip()
                     return description
         return ''
 
@@ -412,13 +449,14 @@ class Site_parser:
         title = ''
         titles = bs4.findAll('title')
         for title in titles:
-            return title.get_text().replace('\n', '').strip()
+            return title.get_text().replace('\n', '').replace('"', '').replace("'", '').strip()
         return title
 
 
 if __name__ == "__main__":
     db_host = os.environ.get("DB_HOST")
-    db_name = os.environ.get("DB_DATABASE")
+    # db_name = os.environ.get("DB_DATABASE")
+    db_name = 'test_domains'
     db_user = os.environ.get("DB_USER")
     db_password = os.environ.get("DB_PASSWORD")
 
