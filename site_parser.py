@@ -49,22 +49,111 @@ class Site_parser:
         self.db_user = db_user
         self.db_password = db_password
 
-        self.connection = self.create_connection()
-        self.domains = self.select_status_200_from_db()
-        self.categories = self.select_categories_from_db()
-        self.regions_by_inn = self.select_regions_from_db()
+        self.timeout_sec = 30
+
+        self.connection = self.__create_connection()
+
+        self.statuses_table_name = 'domains'
+        self.domain_info_table_name = 'domain_info'
+        self.domain_phones_table_name = 'domain_phones'
+        self.domain_emails_table_name = 'domain_emails'
+
+
+        # Начальное создание страниц
+        self.__create_tables()
+        
+        # Получение инфы для парсинга
+        self.domains = self.__make_db_request("SELECT real_domain FROM domains WHERE status=200")
+        self.categories = self.__make_db_request("""
+                    SELECT category.name, subcategory.name, tags.tag FROM category
+                    RIGHT JOIN subcategory ON category.id = subcategory.category_id
+                    INNER JOIN tags ON subcategory.id = tags.id
+                """)
+        self.regions_by_inn = self.__make_db_request("""
+                    SELECT * FROM regions
+                """)
 
     
     def parse(self):
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.parse_all_sites())
+        loop.run_until_complete(self.__parse_all_sites())
 
-    def create_connection(self):
+
+    def __create_tables(self):
+        # domain_info TABLE creation
+        self.__make_db_request(f"""
+                CREATE TABLE IF NOT EXISTS {self.domain_info_table_name} (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    domain_id INT, 
+                    title VARCHAR(255), 
+                    description VARCHAR(255), 
+                    city VARCHAR(255), 
+                    inn VARCHAR(255), 
+                    cms VARCHAR(100),
+                    FOREIGN KEY (domain_id) REFERENCES {self.statuses_table_name} (Id)
+                );
+            """)
+        
+        # domain_phones TABLE creation
+        self.__make_db_request(f"""
+                CREATE TABLE IF NOT EXISTS {self.domain_phones_table_name} (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    domain_id INT, 
+                    number VARCHAR(20),
+                    FOREIGN KEY (domain_id) REFERENCES {self.statuses_table_name} (Id)
+                );
+            """)
+
+        # domain_emails TABLE creation
+        self.__make_db_request(f"""
+                CREATE TABLE IF NOT EXISTS {self.domain_emails_table_name} (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    domain_id INT, 
+                    email VARCHAR(100),
+                    FOREIGN KEY (domain_id) REFERENCES {self.statuses_table_name} (Id)
+                );
+            """)
+
+        # regions TABLE creation
+        with open("migrations/regions_migration.sql", "r", encoding='utf-8') as migration:
+            self.__make_db_request(migration.read())         
+            
+        # regions VALUES creation
+        with open("migrations/region_values_migration.sql", "r", encoding='utf-8') as migration:
+            self.__make_db_request(migration.read())    
+
+        # categories TABLE creation
+        with open("migrations/categories_migration.sql", "r", encoding='utf-8') as migration:
+            self.__make_db_request(migration.read())         
+            
+        # categories VALUES creation
+        with open("migrations/categories_values_migration.sql", "r", encoding='utf-8') as migration:
+            self.__make_db_request(migration.read())                
+        
+        # subcategories TABLE creation
+        with open("migrations/subcategories_migration.sql", "r", encoding='utf-8') as migration:
+            self.__make_db_request(migration.read())         
+            
+        # subcategories VALUES creation
+        with open("migrations/subcategories_values_migration.sql", "r", encoding='utf-8') as migration:
+            self.__make_db_request(migration.read())   
+
+        # tags TABLE creation
+        with open("migrations/tags_migration.sql", "r", encoding='utf-8') as migration:
+            self.__make_db_request(migration.read())         
+            
+        # tags VALUES creation
+        with open("migrations/tags_values_migration.sql", "r", encoding='utf-8') as migration:
+            self.__make_db_request(migration.read())  
+
+
+    def __create_connection(self):
         connection = pymysql.connect(host=self.db_host, user=self.db_user, password=self.db_password,
                                      database=self.db_name, cursorclass=pymysql.cursors.DictCursor)
         return connection
 
-    def get_headers(self):
+
+    def __get_headers(self):
         user_agents = {
             'User-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36',
             'User-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:95.0) Gecko/20100101 Firefox/95.0',
@@ -77,40 +166,15 @@ class Site_parser:
         }
         return user_agents
 
-    def insert_into_db(self, table_name, domain, zone, real_domain, status):
-        with self.connection.cursor() as cursor:
-            sql = f"INSERT INTO {table_name} (domain, zone, real_domain, status) VALUES ('{domain}', '{zone}', '{real_domain}', '{status}')"
-            cursor.execute(sql)
-        self.connection.commit()
 
-    def select_status_200_from_db(self):
+    def __make_db_request(self, sql):
         with self.connection.cursor() as cursor:
-            sql = "SELECT real_domain FROM domains WHERE status=200"
             cursor.execute(sql)
             result = cursor.fetchall()
             return result
 
-    def select_categories_from_db(self):
-        with self.connection.cursor() as cursor:
-            sql = """
-                    SELECT category.name, subcategory.name, tags.tag FROM category
-                    RIGHT JOIN subcategory ON category.id = subcategory.category_id
-                    INNER JOIN tags ON subcategory.id = tags.id
-                """
-            cursor.execute(sql)
-            result = cursor.fetchall()
-            return result
 
-    def select_regions_from_db(self):
-        with self.connection.cursor() as cursor:
-            sql = """
-                    SELECT * FROM regions
-                """
-            cursor.execute(sql)
-            result = cursor.fetchall()
-            return result
-
-    async def parse_all_sites(self):
+    async def __parse_all_sites(self):
         start_index = 0
         step = 10000
         requests = []
@@ -120,7 +184,7 @@ class Site_parser:
 
         for portion in range(start_index, len(self.domains), step):
             for domain_index in range(start_index, portion):
-                requests.append(self.parse_site(
+                requests.append(self.__parse_site(
                     self.domains[domain_index]["real_domain"], domain_index+1, start_time))
             await asyncio.gather(*requests)
             requests.clear()
@@ -129,44 +193,45 @@ class Site_parser:
         print(
             f"Парсинг {domain_index+1} сайтов закончился за {time.time() - start_time}")
 
-    async def parse_site(self, domain, counter, start_time):
-        timeout_sec = 30
+
+    async def __parse_site(self, domain, counter, start_time):
         session_timeout = aiohttp.ClientTimeout(
-            total=None, sock_connect=timeout_sec, sock_read=timeout_sec)
+            total=None, sock_connect=self.timeout_sec, sock_read=self.timeout_sec)
         session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(
             verify_ssl=False), timeout=session_timeout)
         try:
-            async with session.get(domain, headers=self.get_headers()) as response:
+            async with session.get(domain, headers=self.__get_headers()) as response:
                 url = response.url
                 html = await response.text()
 
                 print(
                     f"№{counter} - {time.time() - start_time} ----------------------------------------------------")
                 print(f"URL: {url}")
-                await self.identify_site(html, counter)
+                await self.__identify_site(html, counter)
                 counter += 1
         except Exception as error:
             print(error)
         finally:
             await session.close()
 
-    async def identify_site(self, html, index):
+
+    async def __identify_site(self, html, index):
         bs4 = BeautifulSoup(html, "lxml")
 
-        valid = await self.check_valid(bs4)
+        valid = await self.__check_valid(bs4)
         if valid:
             print(f"Valid: {valid}")
         if not valid:
             return
 
-        title = await self.find_title(bs4)  # Возврат: string
-        description = await self.find_description(bs4)  # Возврат: string
-        cms = await self.identify_cms(bs4)  # Возврат: string
-        contacts = await self.find_contacts(bs4) # Возврат: {'mobile_numbers': [], 'emails:': []}
-        inn = await self.find_inn(bs4.text)  # Возврат: ['ИНН1', 'ИНН2', ...]
-        category = await self.identify_category(title, description) # Возврат: {'category': 'Предоставление прочих видов услуг', 'subcategory': 'Предоставление прочих персональных услуг'}
-        cities_via_number = await self.identify_city_by_number(contacts['mobile_numbers']) # Возврат: ['Город1', 'Город2', ...]
-        cities_via_inn = await self.identify_city_by_inn(inn) # Возврат: ['Москва', 'Калининградская область', 'Архангельская область'...]
+        title = await self.__find_title(bs4)  # Возврат: string
+        description = await self.__find_description(bs4)  # Возврат: string
+        cms = await self.__identify_cms(bs4)  # Возврат: string
+        contacts = await self.__find_contacts(bs4) # Возврат: {'mobile_numbers': [], 'emails:': []}
+        inn = await self.__find_inn(bs4.text)  # Возврат: ['ИНН1', 'ИНН2', ...]
+        category = await self.__identify_category(title, description) # Возврат: {'category': 'Предоставление прочих видов услуг', 'subcategory': 'Предоставление прочих персональных услуг'}
+        cities_via_number = await self.__identify_city_by_number(contacts['mobile_numbers']) # Возврат: ['Город1', 'Город2', ...]
+        cities_via_inn = await self.__identify_city_by_inn(inn) # Возврат: ['Москва', 'Калининградская область', 'Архангельская область'...]
 
         print(f"Title: {title}")
         print(f"Description: {description}")
@@ -178,8 +243,8 @@ class Site_parser:
         print(f"Города через ИНН: {cities_via_inn}\n")
 
     # TODO: Переделать под поиск слов в тексте
-    async def identify_category(self, title, description):
-        categories = await self.get_categories_dict()
+    async def __identify_category(self, title, description):
+        categories = await self.__get_categories_dict()
         for category in categories:
             for subcategory in categories[category]:
                 for keyword in categories[category][subcategory]:
@@ -189,7 +254,7 @@ class Site_parser:
 
 
     # Преобразует sql запрос в нужный формат
-    async def get_categories_dict(self):
+    async def __get_categories_dict(self):
         # Получение названий категорий без дубликатов
         raw_categories = self.categories
         category_titles = []
@@ -213,7 +278,7 @@ class Site_parser:
         return tags_dict
 
 
-    async def identify_city_by_inn(self, inns):
+    async def __identify_city_by_inn(self, inns):
         # print(regions)
         result_regions = []
         for inn in inns:
@@ -223,7 +288,7 @@ class Site_parser:
         return result_regions
 
 
-    async def identify_city_by_number(self, numbers):
+    async def __identify_city_by_number(self, numbers):
         cities = []
         for number in numbers:
             valid_number = phonenumbers.parse(number, "RU")
@@ -233,7 +298,7 @@ class Site_parser:
         return list(set(cities))
 
 
-    async def find_inn(self, text):
+    async def __find_inn(self, text):
         # TODO: Отсечь личшние символы вначале и в конце, потому что схватывает рандомные числа из ссылок
         ideal_pattern = re.compile('\b\d{4}\d{6}\d{2}\\b|\\b\d{4}\d{5}\d{1}\\b')
         all_inns = list(set(re.findall(ideal_pattern, text)))
@@ -279,7 +344,7 @@ class Site_parser:
     # TODO: Проверить скорость с более точным поиском
     # Находить контакты можно чаще, но медленнее
     # можно искать все классы, в которых будет phone, contacts
-    async def find_contacts(self, bs4):
+    async def __find_contacts(self, bs4):
         links = bs4.findAll('a')
         mobile_numbers = []
         emails = []
@@ -297,7 +362,7 @@ class Site_parser:
         return {'mobile_numbers': list(set(mobile_numbers)), 'emails:': list(set(emails))}
 
 
-    async def identify_cms(self, html):
+    async def __identify_cms(self, html):
         cms_keywords = {
             '<link href="/bitrix/js/main': 'Bitrix',
             '/wp-content/themes/':  'Wordpress',
@@ -316,7 +381,7 @@ class Site_parser:
                 return cms_keywords[keyword]
 
 
-    async def check_valid(self, bs4):
+    async def __check_valid(self, bs4):
         text = bs4.text
         valid = True
         invalid_keywords = ['reg.ru', 'линковка', 'купить домен', 'домен припаркован', 'только что создан', 'сайт создан', 'приобрести домен',
@@ -332,7 +397,7 @@ class Site_parser:
         return valid
 
 
-    async def find_description(self, bs4):
+    async def __find_description(self, bs4):
         description = ''
         meta_tags = bs4.findAll('meta')
         for meta in meta_tags:
@@ -343,13 +408,12 @@ class Site_parser:
         return ''
 
 
-    async def find_title(self, bs4):
+    async def __find_title(self, bs4):
         title = ''
         titles = bs4.findAll('title')
         for title in titles:
             return title.get_text().replace('\n', '').strip()
         return title
-
 
 
 if __name__ == "__main__":
