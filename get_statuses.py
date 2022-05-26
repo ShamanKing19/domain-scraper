@@ -1,4 +1,7 @@
+from genericpath import exists
 import os, time
+from urllib.request import urlretrieve
+import zipfile
 try:
     import asyncio
 except:
@@ -15,6 +18,9 @@ try:
     from dotenv import load_dotenv
 except:
     os.system("pip install python-dotenv")
+from zipfile import ZipFile
+import urllib
+
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path)
@@ -22,9 +28,12 @@ import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning) 
 
 
-
 class StatusParser:
     def __init__(self, db_host, db_name, db_user, db_password, db_table_name):
+        self.download_link = "https://statonline.ru/domainlist/file?tld="
+        self.extracted_files_path = "archives/extracted"
+        self.archive_path = "archives/ru.zip"
+        
         self.file_path = "archives/extracted/ru_domains.txt"
         self.zone = 'ru'
         
@@ -42,9 +51,34 @@ class StatusParser:
         # Будет выводиться каждая запись кратная этому числу
         self.every_printable = 10
 
-        self.domains = self.__get_rows_from_txt()
+        self.domains = []
 
-    def create_table_if_not_exists(self):
+
+    def parse_statuses(self):
+        self.__create_table_if_not_exists()
+        self.__download_ru_domains_file_if_not_exists()
+        self.domains = self.__get_rows_from_txt()
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.__request_all())
+
+
+
+    def __download_ru_domains_file_if_not_exists(self):
+        if (exists(self.file_path)): return
+        start_time = time.time()
+        print("Началась загрузка файла с доменами...")
+        urlretrieve(self.download_link, self.archive_path)
+        print(f"Файл загружен за {time.time() - start_time}")
+        
+        print("Начата распаковка файла")
+        with zipfile.ZipFile(self.archive_path, 'r') as zip_file:
+            zip_file.extractall(self.extracted_files_path)
+        print("Файл распакован")
+        os.remove(self.archive_path)
+        print("Архив удалён")
+
+
+    def __create_table_if_not_exists(self):
         sql = f"""
                 CREATE TABLE IF NOT EXISTS {self.table_name} (
                     id INT PRIMARY KEY AUTO_INCREMENT,
@@ -55,11 +89,7 @@ class StatusParser:
                 );
             """
         self.__make_db_request(sql)
-
-
-    def parse_statuses(self):
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.__request_all())
+        print(f"Таблица {self.table_name} создана в базе {self.db_name}")
 
 
     def __get_headers(self):
@@ -137,15 +167,13 @@ class StatusParser:
 
 def main():
     db_host = os.environ['DB_HOST']
-    # db_name = os.environ['DB_DATABASE']
-    db_name = 'admin_domains_test'
+    db_name = os.environ['DB_DATABASE']
     db_user = os.environ['DB_USER']
     db_password = os.environ['DB_PASSWORD']
     db_table_name = 'domains'
 
 
     status_parser = StatusParser(db_host, db_name, db_user, db_password, db_table_name)
-    status_parser.create_table_if_not_exists()
     status_parser.parse_statuses()
 
 
