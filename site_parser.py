@@ -2,7 +2,7 @@ import warnings
 import os
 import time
 import re
-import json
+
 try:
     import asyncio
 except:
@@ -174,9 +174,9 @@ class Site_parser:
              self.step = domains_count-1
 
         # TODO: Починить. Прогоняется всего 10к записей (в первом парсере будет такая же ошибка под конец парсинга)        
-        for portion in range(start_index, domains_count, self.step):
-
+        for portion in range(start_index, domains_count+self.step, self.step):
             for domain_index in range(start_index, portion):
+                if domain_index == domains_count: break
                 requests.append(self.__parse_site(self.domains[domain_index]["real_domain"], self.domains[domain_index]["id"], domain_index+1, start_time))
             
             await asyncio.gather(*requests)
@@ -213,14 +213,13 @@ class Site_parser:
         # TODO: Исправить проблему с кодировкой (нужно сделать кодировку utf8 для html)
         bs4 = BeautifulSoup(html, "lxml")
 
-        valid = await self.__check_valid(bs4)
+        valid = await self.__check_valid(html)
         if not valid:
             return
 
         title = await self.__find_title(bs4)  # Возврат: string
         description = await self.__find_description(bs4)  # Возврат: string
         cms = await self.__identify_cms(html)  # Возврат: string
-        # TODO: Проверить, может ошибка с "Unknown column" может идти отсюда, потому что может вернуть пустой массив"
         numbers, emails = await self.__find_contacts(bs4) # Возврат: {'mobile_numbers': [], 'emails:': []}
         inns = await self.__find_inn(bs4.text)  # Возврат: ['ИНН1', 'ИНН2', ...]
         tag_id = await self.__identify_category(title, description) # Возврат: id из таблицы tags
@@ -398,7 +397,8 @@ class Site_parser:
                             'домен недоступен', 'домен временно недоступен', 'вы владелец сайта?', 'технические работы', 'сайт отключен', 'сайт заблокирован',
                             'сайт недоступен', 'это тестовый сервер', 'это тестовый сайт', 'срок регистрации', 'the site is',
                             '503 service', '404 not found', 'fatal error', 'настройте домен', 'under construction',  'не опубликован',
-                            'домен зарегистрирован', 'доступ ограничен', 'welcome to nginx', 'owner of this ']
+                            'домен зарегистрирован', 'доступ ограничен', 'welcome to nginx', 'owner of this ', 'Купите короткий домен',
+                            ]
         for keyword in invalid_keywords:
             if keyword in text:
                 # print(f'Invalid cuz of: {keyword}\n')
