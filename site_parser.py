@@ -348,7 +348,6 @@ class Site_parser:
 
     # TODO: Проверить скорость с более точным поиском
     # TODO: Исправить. Может выдать в такую строку ['74955427679brbr79169573046']
-    # Такое тоже выдало ['79313526492', 'Email', '88313355101', '79200520290', '79253136201']
     # ['882002010120000020000']
     # можно искать все классы, в которых будет phone, contacts
     async def __find_contacts(self, bs4):
@@ -359,12 +358,14 @@ class Site_parser:
             for attribute in a.attrs:
                 if attribute == 'href':
                     if 'tel:' in a[attribute]:
-                        mobile_number = a[attribute].split(':')[1].strip().replace("%20", "")
-                        number = re.sub("[^A-Za-z0-9]", "", mobile_number)
+                        mobile_number = a[attribute].split(':')[-1].strip().replace("%20", "")
+                        # Тут была такая регулярка [^A-Za-z0-9]
+                        number = re.sub("[^0-9]", "", mobile_number)
                         if len(number) > 0: mobile_numbers.append(number)
                     elif 'mailto:' in a[attribute]:
                         email = a[attribute].split(':')[-1].strip()
-                        if len(email) > 0: emails.append(email)
+                        exact_email = re.match(r"^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$", email)    
+                        if exact_email: emails.append(exact_email.string)
         # Так удаляю дубликаты
         return list(set(mobile_numbers)),  list(set(emails))
 
