@@ -159,7 +159,9 @@ class StatusParser:
         try:
             async with session.get(url, headers=self.__get_headers()) as response: # Тут есть allow_redirects=true/false
                 if insert_info["index"] % self.every_printable == 0: print(f'№{insert_info["index"]} - {insert_info["domain"]} выполнен за {time.time() - insert_info["start_time"]} - {response.status}')
-                sql = f"INSERT IGNORE INTO {self.table_name} (domain, zone, real_domain, status) VALUES ('{insert_info['domain']}', '{insert_info['zone']}', '{response.url}', '{response.status}')"
+                response_url = response.url
+                if response.status != 200: response_url = ''
+                sql = f"INSERT IGNORE INTO {self.table_name} (domain, zone, real_domain, status) VALUES ('{insert_info['domain']}', '{insert_info['zone']}', '{response_url}', '{response.status}')"
                 self.__make_db_request(sql)
         except Exception as error:
             if insert_info["index"] % self.every_printable == 0: print(f'№{insert_info["index"]} - {insert_info["domain"]} выполнен за {time.time() - insert_info["start_time"]} - {error}')
