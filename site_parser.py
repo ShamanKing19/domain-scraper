@@ -106,42 +106,16 @@ class Site_parser:
             self.__make_db_request(migration.read())  
         
         # domain_info TABLE creation
-        self.__make_db_request(f"""
-                CREATE TABLE IF NOT EXISTS {self.domain_info_table_name} (
-                    id INT PRIMARY KEY,
-                    domain_id INT, 
-                    title VARCHAR(255), 
-                    description VARCHAR(255), 
-                    city VARCHAR(255), 
-                    inn VARCHAR(255), 
-                    cms VARCHAR(100),
-                    tag_id INT NULL,
-                    status VARCHAR(30) DEFAULT 'Отсутствует',
-                    comment VARCHAR(500),
-                    FOREIGN KEY (domain_id) REFERENCES {self.statuses_table_name} (id),
-                    FOREIGN KEY (tag_id) REFERENCES tags (id)
-                );
-            """)
+        with open("migrations/domain_info_migration.sql", "r", encoding="utf-8") as migration:
+            self.__make_db_request(migration.read())
         
         # domain_phones TABLE creation
-        self.__make_db_request(f"""
-                CREATE TABLE IF NOT EXISTS {self.domain_phones_table_name} (
-                    id INT PRIMARY KEY,
-                    domain_id INT, 
-                    number VARCHAR(20),
-                    FOREIGN KEY (domain_id) REFERENCES {self.statuses_table_name} (id)
-                );
-            """)
+        with open("migrations/domain_phones_migration.sql", "r", encoding="utf-8") as migration:
+            self.__make_db_request(migration.read())
 
         # domain_emails TABLE creation
-        self.__make_db_request(f"""
-                CREATE TABLE IF NOT EXISTS {self.domain_emails_table_name} (
-                    id INT PRIMARY KEY,
-                    domain_id INT, 
-                    email VARCHAR(100),
-                    FOREIGN KEY (domain_id) REFERENCES {self.statuses_table_name} (Id)
-                );
-            """)
+        with open("migrations/domain_emails_migration.sql", "r", encoding="utf-8") as migration:
+            self.__make_db_request(migration.read())
 
         # regions TABLE creation
         with open("migrations/regions_migration.sql", "r", encoding='utf-8') as migration:
