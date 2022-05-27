@@ -66,7 +66,7 @@ class Site_parser:
         # Получение инфы для парсинга
         self.domains = self.__make_db_request("SELECT id, real_domain FROM domains WHERE status=200 GROUP BY real_domain")
         self.categories = self.__make_db_request("""
-                    SELECT category.name, subcategory.name, tags.tag FROM category
+                    SELECT category.name, subcategory.name, tags.tag, tags.id FROM category
                     RIGHT JOIN subcategory ON category.id = subcategory.category_id
                     INNER JOIN tags ON subcategory.id = tags.id
                 """)
@@ -81,50 +81,6 @@ class Site_parser:
 
 
     def __create_tables(self):
-        # domain_info TABLE creation
-        self.__make_db_request(f"""
-                CREATE TABLE IF NOT EXISTS {self.domain_info_table_name} (
-                    id INT PRIMARY KEY,
-                    domain_id INT, 
-                    title VARCHAR(255), 
-                    description VARCHAR(255), 
-                    city VARCHAR(255), 
-                    inn VARCHAR(255), 
-                    cms VARCHAR(100),
-                    status BOOL,
-                    comment VARCHAR(500),
-                    FOREIGN KEY (domain_id) REFERENCES {self.statuses_table_name} (Id)
-                );
-            """)
-        
-        # domain_phones TABLE creation
-        self.__make_db_request(f"""
-                CREATE TABLE IF NOT EXISTS {self.domain_phones_table_name} (
-                    id INT PRIMARY KEY AUTO_INCREMENT,
-                    domain_id INT, 
-                    number VARCHAR(20),
-                    FOREIGN KEY (domain_id) REFERENCES {self.statuses_table_name} (Id)
-                );
-            """)
-
-        # domain_emails TABLE creation
-        self.__make_db_request(f"""
-                CREATE TABLE IF NOT EXISTS {self.domain_emails_table_name} (
-                    id INT PRIMARY KEY AUTO_INCREMENT,
-                    domain_id INT, 
-                    email VARCHAR(100),
-                    FOREIGN KEY (domain_id) REFERENCES {self.statuses_table_name} (Id)
-                );
-            """)
-
-        # regions TABLE creation
-        with open("migrations/regions_migration.sql", "r", encoding='utf-8') as migration:
-            self.__make_db_request(migration.read())         
-            
-        # regions VALUES creation
-        with open("migrations/region_values_migration.sql", "r", encoding='utf-8') as migration:
-            self.__make_db_request(migration.read())    
-
         # categories TABLE creation
         with open("migrations/categories_migration.sql", "r", encoding='utf-8') as migration:
             self.__make_db_request(migration.read())         
@@ -148,6 +104,53 @@ class Site_parser:
         # tags VALUES creation
         with open("migrations/tags_values_migration.sql", "r", encoding='utf-8') as migration:
             self.__make_db_request(migration.read())  
+        
+        # domain_info TABLE creation
+        self.__make_db_request(f"""
+                CREATE TABLE IF NOT EXISTS {self.domain_info_table_name} (
+                    id INT PRIMARY KEY,
+                    domain_id INT, 
+                    title VARCHAR(255), 
+                    description VARCHAR(255), 
+                    city VARCHAR(255), 
+                    inn VARCHAR(255), 
+                    cms VARCHAR(100),
+                    tag_id INT NULL,
+                    status BOOL,
+                    comment VARCHAR(500),
+                    FOREIGN KEY (domain_id) REFERENCES {self.statuses_table_name} (id),
+                    FOREIGN KEY (tag_id) REFERENCES tags (id)
+                );
+            """)
+        
+        # domain_phones TABLE creation
+        self.__make_db_request(f"""
+                CREATE TABLE IF NOT EXISTS {self.domain_phones_table_name} (
+                    id INT PRIMARY KEY,
+                    domain_id INT, 
+                    number VARCHAR(20),
+                    FOREIGN KEY (domain_id) REFERENCES {self.statuses_table_name} (id)
+                );
+            """)
+
+        # domain_emails TABLE creation
+        self.__make_db_request(f"""
+                CREATE TABLE IF NOT EXISTS {self.domain_emails_table_name} (
+                    id INT PRIMARY KEY,
+                    domain_id INT, 
+                    email VARCHAR(100),
+                    FOREIGN KEY (domain_id) REFERENCES {self.statuses_table_name} (Id)
+                );
+            """)
+
+        # regions TABLE creation
+        with open("migrations/regions_migration.sql", "r", encoding='utf-8') as migration:
+            self.__make_db_request(migration.read())         
+            
+        # regions VALUES creation
+        with open("migrations/region_values_migration.sql", "r", encoding='utf-8') as migration:
+            self.__make_db_request(migration.read())    
+
 
 
     def __create_connection(self):
@@ -176,6 +179,7 @@ class Site_parser:
             result = cursor.fetchall()
             return result
 
+
     def __make_db_insert(self, sql):
         with self.connection.cursor() as cursor:
             cursor.execute(sql)
@@ -187,16 +191,16 @@ class Site_parser:
         requests = []
         start_time = time.time()
         domains_count = len(self.domains)
+        domain_index = 0
 
-        # TODO: Починить
         print(f"Получено {domains_count} уникальных доменов, шаг = {self.step}")
-        # TODO: Прогоняется всего 10к записей (в первом парсере будет такая же ошибка под конец парсинга)
-        # Беда происходит из-за того, что на втором шаге start_index = 10000, а доменов всего 14600 и шаг 10000
-        # 
-        # Без try, catch этого спарсилось 4600 строк
+        
+        # Для маленького количества записей
+        if self.step > domains_count:
+             self.step = domains_count-1
+
+        # TODO: Починить. Прогоняется всего 10к записей (в первом парсере будет такая же ошибка под конец парсинга)        
         for portion in range(start_index, domains_count, self.step):
-            
-            #if domains_count + self.step > 0: self.step = domains_count-start_index
 
             for domain_index in range(start_index, portion):
                 requests.append(self.__parse_site(self.domains[domain_index]["real_domain"], self.domains[domain_index]["id"], domain_index+1, start_time))
@@ -204,8 +208,11 @@ class Site_parser:
             await asyncio.gather(*requests)
             start_index = portion
             requests.clear()
+
+            # Фикс последнего шага
+            if domain_index + self.step >= domains_count: self.step = domains_count - domain_index - 1
         
-        # print(f"Парсинг {domain_index+1} сайтов закончился за {time.time() - start_time}")
+        print(f"Парсинг {domain_index+1} сайтов закончился за {time.time() - start_time}")
 
 
 
@@ -220,10 +227,10 @@ class Site_parser:
                 # print(f"№{counter} - {time.time() - start_time} - URL: {url}")
                 await self.__identify_site(html, domain_id)
                 counter += 1
-        # Даже к сайтам со статусом 200 парсер можен не подключиться, поэтому тут обработка
+        # Даже к сайтам со статусом 200 парсер может не подключиться, поэтому тут обработка
         except Exception as error:
             print(f"№{counter} - {time.time() - start_time} - URL: {domain}")
-            print(error)
+            print(error, end="\n")
         finally:
             await session.close()
 
@@ -239,11 +246,13 @@ class Site_parser:
         title = await self.__find_title(bs4)  # Возврат: string
         description = await self.__find_description(bs4)  # Возврат: string
         cms = await self.__identify_cms(html)  # Возврат: string
-        contacts = await self.__find_contacts(bs4) # Возврат: {'mobile_numbers': [], 'emails:': []}
+        # TODO: Проверить, может ошибка с "Unknown column" может идти отсюда, потому что может вернуть пустой массив"
+        numbers, emails = await self.__find_contacts(bs4) # Возврат: {'mobile_numbers': [], 'emails:': []}
         inns = await self.__find_inn(bs4.text)  # Возврат: ['ИНН1', 'ИНН2', ...]
-        category = await self.__identify_category(title, description) # Возврат: {'category': 'Предоставление прочих видов услуг', 'subcategory': 'Предоставление прочих персональных услуг'}
-        cities_via_number = await self.__identify_city_by_number(contacts['mobile_numbers']) # Возврат: ['Город1', 'Город2', ...]
+        tag_id = await self.__identify_category(title, description) # Возврат: id из таблицы tags
+        cities_via_number = await self.__identify_city_by_number(numbers) # Возврат: ['Город1', 'Город2', ...]
         cities_via_inn = await self.__identify_city_by_inn(inns) # Возврат: ['Москва', 'Калининградская область', 'Архангельская область'...]
+
         # Тут можно попробовать убрать проверку, может быть оно не сломается
         if len(cities_via_inn) > 0:
             city = ",".join(cities_via_inn)
@@ -253,59 +262,48 @@ class Site_parser:
             city = ""
         inn = ",".join(inns)
 
-
-    
+        # Информация в таблицу domain_info
         self.__make_db_insert(f"""
-                    INSERT IGNORE INTO {self.domain_info_table_name} (id, domain_id, title, description, city, inn, cms) 
-                    VALUE ({domain_id}, {domain_id}, '{title}', '{description}', '{city}', '{inn}', '{cms}')
-                """)
+            INSERT IGNORE INTO {self.domain_info_table_name} (id, domain_id, title, description, city, inn, cms, tag_id) 
+            VALUE ({domain_id}, {domain_id}, '{title}', '{description}', '{city}', '{inn}', '{cms}', {tag_id})
+        """)
 
+        # Информация в таблицу domain_phones
+        for number in numbers:
+            self.__make_db_insert(f"""
+                INSERT IGNORE INTO {self.domain_phones_table_name} (id, domain_id, number) 
+                VALUE ({domain_id}, {domain_id}, {number})
+            """)
+
+        # Информация в таблицу domain_emails
+        for email in emails:
+            email = email.strip()
+            self.__make_db_insert(f"""
+                INSERT IGNORE INTO {self.domain_emails_table_name} (id, domain_id, email) 
+                VALUE ({domain_id}, {domain_id}, '{email}')
+            """)
+        
         # print(f"Title: {title}")
         # print(f"Description: {description}")
         # print(f"CMS: {cms}")
-        # print(f"Контакты: {contacts}")
+        # print(f"Номера: {numbers}")
+        # print(f"Почты: {emails}")
         # print(f"ИНН: {inns}\n")
         # print(f"Категория: {category}")
         # print(f"Города через номер: {cities_via_number}")
         # print(f"Города через ИНН: {cities_via_inn}\n")
-
-
         
 
-    # TODO: Переделать под поиск слов в тексте
     async def __identify_category(self, title, description):
-        categories = await self.__get_categories_dict()
-        for category in categories:
-            for subcategory in categories[category]:
-                for keyword in categories[category][subcategory]:
-                    if keyword in title or keyword in description:
-                        return {"category": category, "subcategory": subcategory}
-                    # print(f'Category: {category}, Subcategory: {subcategory}, keyword: {keyword}')
-
-
-    # Преобразует sql запрос в нужный формат
-    async def __get_categories_dict(self):
-        # Получение названий категорий без дубликатов
-        raw_categories = self.categories
-        category_titles = []
-        for row in raw_categories:
-            category_titles.append(row['name'])
-        category_titles = list(set(category_titles))
-
-        # Заполнение словаря заголовками
-        tags_dict = {}
-        for title in category_titles:
-            tags_dict[title] = {}
-
-        # Заполнение словаря тэгов
-        for row in raw_categories:
-            category_name = row['name']
-            subcategory_name = row['subcategory.name']
-            tags = row['tag'].split(', ')
-            tags_dict[category_name][subcategory_name] = tags
-
-        # print(json.dumps(tags_dict, indent=4, sort_keys=True, ensure_ascii=False))
-        return tags_dict
+        # tags = []
+        for item in self.categories:
+            for tag in item['tag'].split(','):
+                if tag in title or tag in description:
+                    # print(f'Совпало по ключевому слову: {tag}')
+                    return item['id']
+                    #Это если надо будет добавлять список ключевых слов от разных подкатегорий
+                    # tags.append(tag)
+        return 0
 
 
     async def __identify_city_by_inn(self, inns):
@@ -376,7 +374,7 @@ class Site_parser:
 
 
     # TODO: Проверить скорость с более точным поиском
-    # TODO: Может выдать в такую строку ['74955427679brbr79169573046']
+    # TODO: Исправить. Может выдать в такую строку ['74955427679brbr79169573046']
     # Такое тоже выдало ['79313526492', 'Email', '88313355101', '79200520290', '79253136201']
     # ['882002010120000020000']
     # можно искать все классы, в которых будет phone, contacts
@@ -388,14 +386,14 @@ class Site_parser:
             for attribute in a.attrs:
                 if attribute == 'href':
                     if 'tel:' in a[attribute]:
-                        mobile_number = a[attribute].split(':')[1].strip()
+                        mobile_number = a[attribute].split(':')[1].strip().replace("%20", "")
                         number = re.sub("[^A-Za-z0-9]", "", mobile_number)
                         if len(number) > 0: mobile_numbers.append(number)
                     elif 'mailto:' in a[attribute]:
                         email = a[attribute].split(':')[-1].strip()
                         if len(email) > 0: emails.append(email)
         # Так удаляю дубликаты
-        return {'mobile_numbers': list(set(mobile_numbers)), 'emails:': list(set(emails))}
+        return list(set(mobile_numbers)),  list(set(emails))
 
 
     async def __identify_cms(self, html):
@@ -433,6 +431,7 @@ class Site_parser:
                 return False
         return valid
 
+    # TODO: Исправить
     # Описание ещё могут засунуть в <meta name="keywords" content"тут писание" ...>
     async def __find_description(self, bs4):
         description = ''
@@ -440,6 +439,7 @@ class Site_parser:
         for meta in meta_tags:
             for attribute in meta.attrs:
                 if 'description' in meta[attribute]:
+                    # TODO: Тут может вылететь ошибка если не аттрибута 'content' 
                     description = meta['content'].replace('\n', '').replace('"', '').replace("'", '').strip()
                     return description
         return ''
@@ -455,8 +455,7 @@ class Site_parser:
 
 if __name__ == "__main__":
     db_host = os.environ.get("DB_HOST")
-    # db_name = os.environ.get("DB_DATABASE")
-    db_name = 'test_domains'
+    db_name = os.environ.get("DB_DATABASE")
     db_user = os.environ.get("DB_USER")
     db_password = os.environ.get("DB_PASSWORD")
 
