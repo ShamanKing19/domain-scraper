@@ -116,7 +116,7 @@ class Site_parser:
                     inn VARCHAR(255), 
                     cms VARCHAR(100),
                     tag_id INT NULL,
-                    status BOOL,
+                    status VARCHAR(30) DEFAULT 'Отсутствует',
                     comment VARCHAR(500),
                     FOREIGN KEY (domain_id) REFERENCES {self.statuses_table_name} (id),
                     FOREIGN KEY (tag_id) REFERENCES tags (id)
@@ -417,16 +417,16 @@ class Site_parser:
 
 
     async def __check_valid(self, bs4):
-        text = bs4.text
+        text = bs4
         valid = True
-        invalid_keywords = ['reg.ru', 'линковка', 'купить домен', 'домен припаркован', 'только что создан', 'сайт создан', 'приобрести домен',
+        invalid_keywords = ['reg.ru', 'линковка', 'купить домен', 'домен припаркован', 'только что создан', 'сайт создан', 'сайт в разработке', 'приобрести домен',
                             'получить домен', 'получи домен', 'домен продаётся', 'domain for sale', 'домен продается', 'домен продаётся',
                             'домен недоступен', 'домен временно недоступен', 'вы владелец сайта?', 'технические работы', 'сайт отключен', 'сайт заблокирован',
                             'сайт недоступен', 'это тестовый сервер', 'это тестовый сайт', 'срок регистрации', 'the site is',
                             '503 service', '404 not found', 'fatal error', 'настройте домен', 'under construction',  'не опубликован',
                             'домен зарегистрирован', 'доступ ограничен', 'welcome to nginx', 'owner of this ']
         for keyword in invalid_keywords:
-            if keyword in text.lower():
+            if keyword in text:
                 # print(f'Invalid cuz of: {keyword}\n')
                 return False
         return valid
