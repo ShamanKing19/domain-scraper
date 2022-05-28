@@ -27,7 +27,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 class StatusParser:
-    def __init__(self, db_host, db_name, db_user, db_password, db_table_name, is_update):
+    def __init__(self, db_host, db_name, db_user, db_password, db_table_name, is_table_exists):
         self.download_link = "https://statonline.ru/domainlist/file?tld="
         self.archives_path = "archives"
         self.ru_archive_path = "archives/ru.zip"
@@ -51,22 +51,20 @@ class StatusParser:
         # Будет выводиться каждая запись кратная этому числу
         self.every_printable = 10000
 
-        self.is_update = is_update
+        self.is_table_exists = is_table_exists
 
-        if is_update: 
+        if self.is_table_exists: 
             self.domains = self.__make_db_request(f"SELECT * FROM {self.table_name}")
         else:
             self.__create_table_if_not_exists()
             self.__download_ru_domains_file_if_not_exists()
             self.domains = self.__get_rows_from_txt()
         
+
     def run(self):
-      
         loop = asyncio.get_event_loop()
-        try:
-            loop.run_until_complete(self.__request_all())
-        except OSError:
-            print("Тут была OSerror")
+        loop.run_until_complete(self.__request_all())
+
 
     def __download_ru_domains_file_if_not_exists(self):
         if (exists(self.file_path)): return
@@ -103,16 +101,8 @@ class StatusParser:
 
 
     def __create_table_if_not_exists(self):
-        sql = f"""
-                CREATE TABLE IF NOT EXISTS {self.table_name} (
-                    id INT PRIMARY KEY AUTO_INCREMENT,
-                    domain VARCHAR(255),
-                    zone VARCHAR(10),
-                    real_domain VARCHAR(255),
-                    status INT
-                );
-            """
-        self.__make_db_request(sql)
+        with open("migrations/domains_migration.sql", "r", encoding='utf-8') as migration:
+            self.__make_db_request(migration.read())
 
 
     def __get_headers(self):
@@ -142,14 +132,6 @@ class StatusParser:
         return result
 
 
-    def __get_number_of_existing_rows(self):
-        with self.connection.cursor() as cursor:
-            cursor.execute(f"SELECT * FROM {self.table_name}")
-            result = cursor.fetchall()
-        self.connection.commit()
-        return len(result)
-
-    # TODO: Объединить с __update_domain чтобы не было дублирования кода
     # insert_info = {"domain": domain, "index": index, "zone": zone, "start_time": start_time}
     async def __insert_domain(self, insert_info):   
         session_timeout = aiohttp.ClientTimeout(total = None, sock_connect = self.timeout, sock_read = self.timeout)
@@ -159,45 +141,30 @@ class StatusParser:
         try:
             async with session.get(url, headers=self.__get_headers()) as response: # Тут есть allow_redirects=true/false
                 if insert_info["index"] % self.every_printable == 0: print(f'№{insert_info["index"]} - {insert_info["domain"]} выполнен за {time.time() - insert_info["start_time"]} - {response.status}')
-                response_url = response.url
-                if response.status != 200: response_url = ''
-                sql = f"INSERT IGNORE INTO {self.table_name} (domain, zone, real_domain, status) VALUES ('{insert_info['domain']}', '{insert_info['zone']}', '{response_url}', '{response.status}')"
-                self.__make_db_request(sql)
+                real_domain = response.url
+                status = response.status
+                if status != 200: real_domain = ''
+
         except Exception as error:
             if insert_info["index"] % self.every_printable == 0: print(f'№{insert_info["index"]} - {insert_info["domain"]} выполнен за {time.time() - insert_info["start_time"]} - {error}')
-            sql = f"INSERT IGNORE INTO {self.table_name} (domain, zone, real_domain, status) VALUES ('{insert_info['domain']}', '{insert_info['zone']}', '', 404)"
-            self.__make_db_request(sql)
-        finally:
-            await session.close()
+            real_domain = ''
+            status = 404
 
-    # TODO: Объединить с __insert_domain чтобы не было дублирования кода
-    # update_info = {"domain": domain, "index": index, "zone": zone, "start_time": start_time}
-    async def __update_domain(self, update_info):   
-        session_timeout = aiohttp.ClientTimeout(total = None, sock_connect = self.timeout, sock_read = self.timeout)
-        session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False), timeout=session_timeout)
-        url = "http://" + update_info["domain"]
-
-        try:
-            async with session.get(url, headers=self.__get_headers()) as response: # Тут есть allow_redirects=true/false
-                if update_info["index"] % self.every_printable == 0: print(f'№{update_info["index"]} - {update_info["domain"]} выполнен за {time.time() - update_info["start_time"]} - {response.status}')
-                response_url = response.url
-                if response.status != 200: response_url = ''
-                sql = f"UPDATE {self.table_name} SET real_domain='{response_url}', status={response.status} WHERE id={update_info['index']}"
-                self.__make_db_request(sql)
-        except Exception as error:
-            if update_info["index"] % self.every_printable == 0: print(f'№{update_info["index"]} - {update_info["domain"]} выполнен за {time.time() - update_info["start_time"]} - {error}')
-            sql = f"UPDATE {self.table_name} SET real_domain='', status=404 WHERE id={update_info['index']}"
-            self.__make_db_request(sql)
         finally:
+            sql = f"""
+                INSERT INTO {self.table_name} (domain, zone, real_domain, status) 
+                VALUES ('{insert_info['domain']}', '{insert_info['zone']}', '{real_domain}', '{status}')
+                ON DUPLICATE KEY UPDATE real_domain='{real_domain}', status='{status}'
+            """
+            self.__make_db_request(sql)
             await session.close()
 
 
+    # TODO: Придумать настройку чтобы была возможность продолжить парсинг после остановки не обновляя предыдущие записи
     async def __request_all(self):
-        if self.is_update:
-            start_index = 0
-        else:
-            start_index = self.__get_number_of_existing_rows()
-            
+        start_index = 0
+        #start_index = self.__get_number_of_existing_rows()
+        
         requests = []
         start_time = time.time()
         domains_count = len(self.domains)
@@ -214,7 +181,7 @@ class StatusParser:
                     "zone": self.domains[domain_index]['zone'],
                     "start_time": start_time
                 }
-                if self.is_update:
+                if self.is_table_exists:
                     requests.append(self.__update_domain(insert_info))
                 else:
                     requests.append(self.__insert_domain(insert_info))
