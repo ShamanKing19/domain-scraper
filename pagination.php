@@ -6,11 +6,13 @@ function Pagination($countpages)
         <ul class="pagination">
             <?
             #НЕ ПУСТОЙ ЧЕКБОКС
-            $checkboxcheckedregion = $_GET['search_checkbox_region'];
-            $checkboxcheckedmobile = $_GET['search_checkbox_mobile'];
-            $checkboxcheckedinn = $_GET['search_checkbox_inn'];
-            $checkboxcheckedemail = $_GET['search_checkbox_email'];
-            $checkboxcheckedstatus = $_GET['checkbox-search-status'];
+            if(isset($_GET['search'])){
+                $checkboxcheckedregion = $_GET['search_checkbox_region'];
+                $checkboxcheckedmobile = $_GET['search_checkbox_mobile'];
+                $checkboxcheckedinn = $_GET['search_checkbox_inn'];
+                $checkboxcheckedemail = $_GET['search_checkbox_email'];
+                $checkboxcheckedstatus = $_GET['checkbox-search-status'];
+            }
             if (!empty($checkboxcheckedregion) || !empty($checkboxcheckedmobile) || !empty($checkboxcheckedinn) || !empty($checkboxcheckedemail) || !empty($checkboxcheckedstatus)) {
                 #Выбрали чекбоксы и поиск по тегу
                 if (!empty ($_GET['search'])) {

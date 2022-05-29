@@ -1,7 +1,7 @@
 <?php
 function countRow($searchtag, $connection)
 {
-    if(!empty($_GET['search'])){
+    if(isset($_GET['search'])){
         $checkboxcheckedregion = $_GET['search_checkbox_region'];
         $checkboxcheckedmobile = $_GET['search_checkbox_mobile'];
         $checkboxcheckedinn = $_GET['search_checkbox_inn'];
@@ -294,11 +294,13 @@ function search($searchtag, $connection){
 
 function initTable($connection)
     {
-    $checkboxcheckedregion = $_GET['search_checkbox_region'];
-    $checkboxcheckedmobile = $_GET['search_checkbox_mobile'];
-    $checkboxcheckedinn = $_GET['search_checkbox_inn'];
-    $checkboxcheckedemail = $_GET['search_checkbox_email'];
-    $checkboxcheckedstatus = $_GET['checkbox-search-status'];
+        if (isset ($_GET['search'])){
+            $checkboxcheckedregion = $_GET['search_checkbox_region'];
+            $checkboxcheckedmobile = $_GET['search_checkbox_mobile'];
+            $checkboxcheckedinn = $_GET['search_checkbox_inn'];
+            $checkboxcheckedemail = $_GET['search_checkbox_email'];
+            $checkboxcheckedstatus = $_GET['checkbox-search-status'];
+        }
     $page = isset($_GET['page']) ? $_GET['page'] : 1;
     $limit = 10;
     $offset = $limit * ($page - 1);
@@ -308,10 +310,12 @@ function initTable($connection)
     $countpages = round($totalpages['COUNT(*)'] / $limit, 0);
     //    print("СТРАНИЦ ВСЕГО ");
     //    print_r($countpages);
-    if ($_GET['page'] > 1) {
-        $realindex = ($_GET['page'] * 10);
-    } else {
-        $realindex = 0;
+    if (isset($_GET['page'])){
+        if ($_GET['page'] > 1) {
+            $realindex = ($_GET['page'] * 10);
+        } else {
+            $realindex = 0;
+        }
     }
     if (empty($checkboxcheckedregion) && empty($checkboxcheckedmobile) && empty($checkboxcheckedinn) && empty($checkboxcheckedemail) && empty($checkboxcheckedstatus)) {
         $results = "SELECT DISTINCT d.real_domain, d.id, d_info.title, d_info.description, d_info.city, d_info.inn, d_info.cms, d_info.status, d_info.comment, c.name, sub_c.name, t.tag, d_info.status, GROUP_CONCAT(d_emails.email), GROUP_CONCAT(d_numbers.number)
@@ -376,12 +380,16 @@ function initTable($connection)
         $validresults .= $limitoffset;
 
     }
-    $results .= $validresults;
+    if (isset($validresults)){
+        $results .= $validresults;
+    }
     $recordset = $connection->query($results);
     ?>
 
     <? while ($row = $recordset->fetch_array()) { ?>
-    <? $row['number'] = explode(',', $row['data']); ?>
+    <?if (isset ($row['data'])){
+        $row['number'] = explode(',', $row['data']);
+    } ?>
     <? if ($row['status'] === 'Завершен') { ?>
 <tbody style="background: #91ff74; opacity: 0.8;">
 <?
@@ -395,7 +403,10 @@ function initTable($connection)
 <?
 }
 ?>
-<? $realindex++ ?>
+<? if (isset($realindex)){
+    $realindex++;
+
+} ?>
 <tr>
     <td><? echo $row['id'] ?> | <? echo $row['real_domain'] ?></td>
     <td><? echo $row['title'] ?></td>
