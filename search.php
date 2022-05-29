@@ -74,7 +74,6 @@ function countRow($searchtag, $connection)
                 $results .= $validjoin . $validresults;
             }
         }
-    }
     else {
         if (!empty ($_GET['search'])) {
             $results = "
@@ -91,6 +90,7 @@ function countRow($searchtag, $connection)
                 FROM domain_info 
                 ";
         }
+    }
     }
     $recordset = $connection->query($results);
     return $recordset->fetch_array();

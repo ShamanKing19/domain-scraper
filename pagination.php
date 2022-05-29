@@ -1,4 +1,5 @@
 <?php
+
 function Pagination($countpages)
 {
     ?>
@@ -6,13 +7,11 @@ function Pagination($countpages)
         <ul class="pagination">
             <?
             #НЕ ПУСТОЙ ЧЕКБОКС
-            if(isset($_GET['search'])){
-                $checkboxcheckedregion = $_GET['search_checkbox_region'];
-                $checkboxcheckedmobile = $_GET['search_checkbox_mobile'];
-                $checkboxcheckedinn = $_GET['search_checkbox_inn'];
-                $checkboxcheckedemail = $_GET['search_checkbox_email'];
-                $checkboxcheckedstatus = $_GET['checkbox-search-status'];
-            }
+            $checkboxcheckedregion = $_GET['search_checkbox_region'];
+            $checkboxcheckedmobile = $_GET['search_checkbox_mobile'];
+            $checkboxcheckedinn = $_GET['search_checkbox_inn'];
+            $checkboxcheckedemail = $_GET['search_checkbox_email'];
+            $checkboxcheckedstatus = $_GET['checkbox-search-status'];
             if (!empty($checkboxcheckedregion) || !empty($checkboxcheckedmobile) || !empty($checkboxcheckedinn) || !empty($checkboxcheckedemail) || !empty($checkboxcheckedstatus)) {
                 #Выбрали чекбоксы и поиск по тегу
                 if (!empty ($_GET['search'])) {
@@ -285,7 +284,7 @@ function Pagination($countpages)
 
                     ?>
                     <li class="page-item">
-                        <a href="?page=1" class="page-link" aria-label="Previous">
+                        <a href="?search=&checkbox-search-status=&page=1" class="page-link" aria-label="Previous">
                             <span aria-hidden="true">« В начало</span>
                         </a>
                     </li>
@@ -297,39 +296,39 @@ function Pagination($countpages)
                             <?
                         } else {
                             ?>
-                            <li class="page-item active"><a class="page-link" href="?page=1">1</a></li>
-                            <li class="page-item"><a class="page-link" href="?page=2">2</a></li>
+                            <li class="page-item active"><a class="page-link" href="?search=&checkbox-search-status=&page=1">1</a></li>
+                            <li class="page-item"><a class="page-link" href="?search=&checkbox-search-status=&page=2">2</a></li>
                         <?
                         }
                     } else {
                         if ($_GET['page'] == 1) {
                             ?>
                             <li class="page-item active"><a class="page-link"
-                                                            href="?page=<? echo $_GET['page'] ?>"><? echo $_GET['page'] ?></a>
+                                                            href="?search=&checkbox-search-status=&page=<? echo $_GET['page'] ?>"><? echo $_GET['page'] ?></a>
                             </li>
                             <li class="page-item"><a class="page-link"
-                                                     href="?page=<? echo $_GET['page'] + 1 ?>"><? echo $_GET['page'] + 1 ?></a>
+                                                     href="?search=&checkbox-search-status=&page=<? echo $_GET['page'] + 1 ?>"><? echo $_GET['page'] + 1 ?></a>
                             </li>
                             <?
                         } elseif (($_GET['page'] < $countpages) & ($_GET['page'] != 1)) {
                             ?>
                             <li class="page-item"><a class="page-link"
-                                                     href="?page=<? echo $_GET['page'] - 1 ?>"><? echo $_GET['page'] - 1 ?></a>
+                                                     href="?search=&checkbox-search-status=&page=<? echo $_GET['page'] - 1 ?>"><? echo $_GET['page'] - 1 ?></a>
                             </li>
                             <li class="page-item active"><a class="page-link"
-                                                            href="?page=<? echo $_GET['page'] ?>"><? echo $_GET['page'] ?></a>
+                                                            href="?search=&checkbox-search-status=&page=<? echo $_GET['page'] ?>"><? echo $_GET['page'] ?></a>
                             </li>
                             <li class="page-item"><a class="page-link"
-                                                     href="?page=<? echo $_GET['page'] + 1 ?>"><? echo $_GET['page'] + 1 ?></a>
+                                                     href="?search=&checkbox-search-status=&page=<? echo $_GET['page'] + 1 ?>"><? echo $_GET['page'] + 1 ?></a>
                             </li>
                             <?
                         } else {
                             ?>
                             <li class="page-item"><a class="page-link"
-                                                     href="?page=<? echo $_GET['page'] - 1 ?>"><? echo $_GET['page'] - 1 ?></a>
+                                                     href="?search=&checkbox-search-status=&page=<? echo $_GET['page'] - 1 ?>"><? echo $_GET['page'] - 1 ?></a>
                             </li>
                             <li class="page-item active"><a class="page-link"
-                                                            href="?page=<? echo $_GET['page'] ?>"><? echo $_GET['page'] ?></a>
+                                                            href="?search=&checkbox-search-status=&page==<? echo $_GET['page'] ?>"><? echo $_GET['page'] ?></a>
                             </li>
                             <?
                         }
@@ -337,7 +336,7 @@ function Pagination($countpages)
                     if ($countpages > 0) {
                         ?>
                         <li class="page-item">
-                            <a href="?page=<? echo $countpages ?>" class="page-link" aria-label="Next">
+                            <a href="?search=&checkbox-search-status=&page=<? echo $countpages ?>" class="page-link" aria-label="Next">
                                 <span aria-hidden="true">В конец »</span>
                             </a>
                         </li>
@@ -345,7 +344,7 @@ function Pagination($countpages)
                     } else {
                         ?>
                         <li class="page-item">
-                            <a href="" class="page-link" aria-label="Next">
+                            <a href="?search=&checkbox-search-status=" class="page-link" aria-label="Next">
                                 <span aria-hidden="true">В конец »</span>
                             </a>
                         </li>
