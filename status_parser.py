@@ -172,7 +172,7 @@ class StatusParser:
         print(f'\n---------------------------------- Начал обработку запросов ----------------------------------\n')
         for portion in range(start_index, domains_count+self.step, self.step):
             if portion == 0: continue # Скип первого шага
-            print(f'Создаю {self.step} задач...')
+            # print(f'Создаю {self.step} задач...')
             for domain_index in range(start_index, portion):
                 if domain_index > domains_count-1: break # Фикс скипа последнего шага и index out of range error
                 insert_info = {
@@ -181,11 +181,8 @@ class StatusParser:
                     "zone": self.domains[domain_index]['zone'],
                     "start_time": start_time
                 }
-                if self.is_table_exists:
-                    requests.append(self.__update_domain(insert_info))
-                else:
-                    requests.append(self.__insert_domain(insert_info))
-
+                requests.append(self.__insert_domain(insert_info))
+            print(f"Парсинг c {start_index} по {portion} начался")
             await asyncio.gather(*requests)
             print(f'---------------------------------- Обработано ссылок с {start_index} до {portion} за {time.time() - start_time} ---------------------------------- ')
             start_index = portion

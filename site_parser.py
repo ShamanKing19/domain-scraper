@@ -51,6 +51,7 @@ class Site_parser:
 
         self.timeout_sec = 30
         self.step = 10000
+        self.every_pritable = 10000
 
         self.connection = self.__create_connection()
 
@@ -173,12 +174,12 @@ class Site_parser:
         if self.step > domains_count:
              self.step = domains_count-1
 
-        # TODO: Починить. Прогоняется всего 10к записей (в первом парсере будет такая же ошибка под конец парсинга)        
+
         for portion in range(start_index, domains_count+self.step, self.step):
             for domain_index in range(start_index, portion):
                 if domain_index == domains_count: break
                 requests.append(self.__parse_site(self.domains[domain_index]["real_domain"], self.domains[domain_index]["id"], domain_index+1, start_time))
-            
+            # print(f"Парсинг с {start_index} по {portion} начался")
             await asyncio.gather(*requests)
             start_index = portion
             requests.clear()
@@ -198,13 +199,14 @@ class Site_parser:
             async with session.get(domain, headers=self.__get_headers()) as response:
                 url = response.url
                 html = await response.text() # TODO: Возможно ошибка кодировки здесь и надо использовать content
-                # print(f"№{counter} - {time.time() - start_time} - URL: {url}")
+                if counter % self.every_pritable == 0: print(f"№{counter} - {time.time() - start_time} - URL: {url}")
                 await self.__identify_site(html, domain_id)
                 counter += 1
         # Даже к сайтам со статусом 200 парсер может не подключиться, поэтому тут обработка
         except Exception as error:
-            print(f"№{counter} - {time.time() - start_time} - URL: {domain}")
-            print(error, end="\n")
+            # print(f"№{counter} - {time.time() - start_time} - URL: {domain}")
+            # print(error, end="\n")
+            pass
         finally:
             await session.close()
 
@@ -237,23 +239,26 @@ class Site_parser:
 
         # Информация в таблицу domain_info
         self.__make_db_insert(f"""
-            INSERT IGNORE INTO {self.domain_info_table_name} (id, domain_id, title, description, city, inn, cms, tag_id) 
+            INSERT INTO {self.domain_info_table_name} (id, domain_id, title, description, city, inn, cms, tag_id) 
             VALUE ({domain_id}, {domain_id}, '{title}', '{description}', '{city}', '{inn}', '{cms}', {tag_id})
+            ON DUPLICATE KEY UPDATE title='{title}', description='{description}', city='{city}', inn='{inn}', cms='{cms}', tag_id={tag_id}
         """)
 
         # Информация в таблицу domain_phones
         for number in numbers:
             self.__make_db_insert(f"""
-                INSERT IGNORE INTO {self.domain_phones_table_name} (id, domain_id, number) 
+                INSERT INTO {self.domain_phones_table_name} (id, domain_id, number) 
                 VALUE ({domain_id}, {domain_id}, {number})
+                ON DUPLICATE KEY UPDATE number='{number}'
             """)
 
         # Информация в таблицу domain_emails
         for email in emails:
             email = email.strip()
             self.__make_db_insert(f"""
-                INSERT IGNORE INTO {self.domain_emails_table_name} (id, domain_id, email) 
+                INSERT INTO {self.domain_emails_table_name} (id, domain_id, email) 
                 VALUE ({domain_id}, {domain_id}, '{email}')
+                ON DUPLICATE KEY UPDATE email='{email}'
             """)
         
         # print(f"Title: {title}")
@@ -267,6 +272,8 @@ class Site_parser:
         # print(f"Города через ИНН: {cities_via_inn}\n")
         
 
+    # TODO: сделать чтобы искало только отдельным словам, а не по вхождениям
+    # TODO: То есть сделать регулярку вместо "for tag in title"... 
     async def __identify_category(self, title, description):
         # tags = []
         for item in self.categories:
@@ -346,9 +353,8 @@ class Site_parser:
             return []
 
 
-    # TODO: Проверить скорость с более точным поиском
-    # TODO: Исправить. Может выдать в такую строку ['74955427679brbr79169573046']
-    # ['882002010120000020000']
+    # TODO: Поменять регулярку для телефонов. 
+    # TODO: Сохранять номера только с валидным количеством цифр (11 или 6)
     # можно искать все классы, в которых будет phone, contacts
     async def __find_contacts(self, bs4):
         links = bs4.findAll('a')
@@ -359,13 +365,13 @@ class Site_parser:
                 if attribute == 'href':
                     if 'tel:' in a[attribute]:
                         mobile_number = a[attribute].split(':')[-1].strip().replace("%20", "")
-                        # Тут была такая регулярка [^A-Za-z0-9]
                         number = re.sub("[^0-9]", "", mobile_number)
-                        if len(number) > 0: mobile_numbers.append(number)
+                        valid_number = re.match(r"^((8|\+7)[\- ]?)?(\(?\d{3}\)?[\- ]?)?[\d\- ]{7,10}$", number)
+                        if valid_number: mobile_numbers.append(valid_number.string)
                     elif 'mailto:' in a[attribute]:
                         email = a[attribute].split(':')[-1].strip()
-                        exact_email = re.match(r"^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$", email)    
-                        if exact_email: emails.append(exact_email.string)
+                        valid_email = re.match(r"^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$", email)    
+                        if valid_email: emails.append(valid_email.string)
         # Так удаляю дубликаты
         return list(set(mobile_numbers)),  list(set(emails))
 
