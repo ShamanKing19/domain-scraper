@@ -2,13 +2,40 @@
 function countRow($searchtag, $connection)
 {
     if(isset($_GET['search'])){
-        $checkboxcheckedregion = $_GET['search_checkbox_region'];
-        $checkboxcheckedmobile = $_GET['search_checkbox_mobile'];
-        $checkboxcheckedinn = $_GET['search_checkbox_inn'];
-        $checkboxcheckedemail = $_GET['search_checkbox_email'];
-        $checkboxcheckedstatus = $_GET['checkbox-search-status'];
+        if(isset($_GET['search_checkbox_region'])){
+            $checkboxcheckedregion = $_GET['search_checkbox_region'];
+        }
+        if(isset($_GET['search_checkbox_mobile'])){
+            $checkboxcheckedmobile = $_GET['search_checkbox_mobile'];
+        }
+        if(isset($_GET['search_checkbox_inn'])){
+            $checkboxcheckedinn = $_GET['search_checkbox_inn'];
+        }
+        if(isset($_GET['search_checkbox_email'])){
+            $checkboxcheckedemail = $_GET['search_checkbox_email'];
+        }
+        if(isset($_GET['search'])){
+            $checkboxcheckedstatus = $_GET['checkbox-search-status'];
+        }
         if (!empty($checkboxcheckedregion) || !empty($checkboxcheckedmobile) || !empty($checkboxcheckedinn) || !empty($checkboxcheckedemail) || !empty($checkboxcheckedstatus)) {
             if (!empty ($_GET['search'])) {
+
+                if(isset($_GET['search_checkbox_region'])){
+                    $checkboxcheckedregion = $_GET['search_checkbox_region'];
+                }
+                elseif(isset($_GET['search_checkbox_mobile'])){
+                    $checkboxcheckedmobile = $_GET['search_checkbox_mobile'];
+                }
+                elseif(isset($_GET['search_checkbox_inn'])){
+                    $checkboxcheckedinn = $_GET['search_checkbox_inn'];
+                }
+                elseif(isset($_GET['search_checkbox_email'])){
+                    $checkboxcheckedemail = $_GET['search_checkbox_email'];
+                }
+                elseif(isset($_GET['search'])){
+                    $checkboxcheckedstatus = $_GET['checkbox-search-status'];
+                }
+
                 $results = "
                 SELECT COUNT(*) FROM domains 
                 JOIN domain_info ON domain_info.domain_id = domains.id
@@ -74,7 +101,6 @@ function countRow($searchtag, $connection)
                 $results .= $validjoin . $validresults;
             }
         }
-    }
     else {
         if (!empty ($_GET['search'])) {
             $results = "
@@ -91,6 +117,7 @@ function countRow($searchtag, $connection)
                 FROM domain_info 
                 ";
         }
+    }
     }
     $recordset = $connection->query($results);
     return $recordset->fetch_array();
@@ -143,17 +170,29 @@ function search($searchtag, $connection){
 //    print("КОЛИЧЕСТВО СТРАНИЦ ");
 //    print_r($countpages);
 //    print_r($searchtag);
-    if ($_GET['page'] > 1) {
-        $realindex = ($_GET['page'] * 10);
-    } else {
-        $realindex = 0;
+    if(isset($GET['page'])){
+        if ($_GET['page'] > 1) {
+            $realindex = ($_GET['page'] * 10);
+        } else {
+            $realindex = 0;
+        }
     }
     if (!empty($searchtag)){
-    $checkboxcheckedregion = $_GET['search_checkbox_region'];
-    $checkboxcheckedmobile = $_GET['search_checkbox_mobile'];
-    $checkboxcheckedinn = $_GET['search_checkbox_inn'];
-    $checkboxcheckedemail = $_GET['search_checkbox_email'];
-    $checkboxcheckedstatus = $_GET['checkbox-search-status'];
+    if(isset($_GET['search_checkbox_region'])){
+        $checkboxcheckedregion = $_GET['search_checkbox_region'];
+    }
+    if(isset($_GET['search_checkbox_mobile'])){
+        $checkboxcheckedmobile = $_GET['search_checkbox_mobile'];
+    }
+    if(isset($_GET['search_checkbox_inn'])){
+        $checkboxcheckedinn = $_GET['search_checkbox_inn'];
+    }
+    if(isset($_GET['search_checkbox_email'])){
+        $checkboxcheckedemail = $_GET['search_checkbox_email'];
+    }
+    if(isset($_GET['search'])){
+        $checkboxcheckedstatus = $_GET['checkbox-search-status'];
+    }
 
     if (empty($checkboxcheckedregion) && empty($checkboxcheckedmobile) && empty($checkboxcheckedinn) && empty($checkboxcheckedemail) && empty($checkboxcheckedstatus)) {
         $results = "SELECT DISTINCT d.real_domain, d.id, d_info.title, d_info.description, d_info.city, d_info.inn, d_info.cms, d_info.status, d_info.comment, c.name, sub_c.name, t.tag, d_info.status, GROUP_CONCAT(d_emails.email), GROUP_CONCAT(d_numbers.number)
@@ -219,13 +258,19 @@ function search($searchtag, $connection){
     $validresults .= $limitoffset;
 
     }
-    $results .= $validresults;
+    if (isset($validresults)){
+        $results .= $validresults;
+    }
     $recordset = $connection->query($results);
     ?>
 
     <? while ($row = $recordset->fetch_array()) { ?>
-    <? $realindex++ ?>
-    <? $row['number'] = explode(',', $row['data']); ?>
+    <? if(isset($realindex)){
+        $realindex++;
+    }?>
+    <? if(isset($row['data'])){
+        $row['number'] = explode(',', $row['data']);
+    }?>
     <? if ($row['status'] === 'Завершен'){ ?>
     <tbody style="background: #91ff74; opacity: 0.8;">
     <?

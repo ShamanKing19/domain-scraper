@@ -7,11 +7,21 @@ function Pagination($countpages)
             <?
             #НЕ ПУСТОЙ ЧЕКБОКС
             if(isset($_GET['search'])){
-                $checkboxcheckedregion = $_GET['search_checkbox_region'];
-                $checkboxcheckedmobile = $_GET['search_checkbox_mobile'];
-                $checkboxcheckedinn = $_GET['search_checkbox_inn'];
-                $checkboxcheckedemail = $_GET['search_checkbox_email'];
-                $checkboxcheckedstatus = $_GET['checkbox-search-status'];
+                if(isset($_GET['search_checkbox_region'])){
+                    $checkboxcheckedregion = $_GET['search_checkbox_region'];
+                }
+                if(isset($_GET['search_checkbox_mobile'])){
+                    $checkboxcheckedmobile = $_GET['search_checkbox_mobile'];
+                }
+                if(isset($_GET['search_checkbox_inn'])){
+                    $checkboxcheckedinn = $_GET['search_checkbox_inn'];
+                }
+                if(isset($_GET['search_checkbox_email'])){
+                    $checkboxcheckedemail = $_GET['search_checkbox_email'];
+                }
+                if(isset($_GET['search'])){
+                    $checkboxcheckedstatus = $_GET['checkbox-search-status'];
+                }
             }
             if (!empty($checkboxcheckedregion) || !empty($checkboxcheckedmobile) || !empty($checkboxcheckedinn) || !empty($checkboxcheckedemail) || !empty($checkboxcheckedstatus)) {
                 #Выбрали чекбоксы и поиск по тегу
