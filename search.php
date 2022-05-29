@@ -100,7 +100,7 @@ function getpostOperation($connection){
         $cardResult = "UPDATE domain_info
                     SET status = '$checkboxStatus'
                     WHERE domain_info.domain_id = '$id';";
-        $connection->queryExecute($cardResult);
+        $connection->query($cardResult);
     }
 
     if ($_POST['comment'] && $_POST['cardID']) {
@@ -109,7 +109,7 @@ function getpostOperation($connection){
         $cardResult = "UPDATE domain_info
                     SET comment = '$comment'
                     WHERE domain_info.domain_id = '$id';";
-        $connection->queryExecute($cardResult);
+        $connection->query($cardResult);
     }
 }
 ?>
@@ -211,7 +211,7 @@ function search($searchtag, $connection){
     $recordset = $connection->query($results);
     ?>
 
-    <? while ($row = $recordset->fetch()) { ?>
+    <? while ($row = $recordset->fetch_array()) { ?>
     <? $realindex++ ?>
     <? $row['number'] = explode(',', $row['data']); ?>
     <? if ($row['status'] === 'Завершен'){ ?>

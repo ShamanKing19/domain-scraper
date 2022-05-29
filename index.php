@@ -2,10 +2,12 @@
 # header
 require_once __DIR__ . "/search.php";
 require_once __DIR__ . "/pagination.php";
-$connection = new mysqli("localhost", "stydent", "stydent", "lemon5.1");
+require_once __DIR__ . "/db.php";
 session_start();
 $searchtag = $_GET['search'];
-$comment = $_REQUEST['commentary']; ?>
+$comment = $_REQUEST['commentary'];
+$connection = createConnection()
+?>
 
 
 <link href="/template_styles.css" rel="stylesheet">
@@ -168,7 +170,8 @@ function initTable($connection)
     <? if ($row['status'] === 'В процессе') { ?>
         <tbody style="background: #e6ff74; opacity: 0.8;">
     <?
-    } ?>
+    }
+    ?>
     <? $realindex++ ?>
     <tr>
         <td><? echo $row['id'] ?> | <? echo $row['real_domain'] ?></td>
