@@ -199,7 +199,7 @@ def main():
     db_table_name = 'domains'
 
 
-    status_parser = StatusParser(db_host, db_name, db_user, db_password, db_table_name, False)
+    status_parser = StatusParser(db_host, db_name, db_user, db_password, db_table_name, True)
     status_parser.run()
 
 
