@@ -37,7 +37,7 @@ class StatusParser:
         if args.table:
             self.is_table_exists = bool(int(args.table))
 
-        
+
         self.db_host = db_host
         self.db_name = db_name
         self.db_user = db_user
@@ -52,17 +52,17 @@ class StatusParser:
         self.step = 10000
 
         # Будет выводиться каждая запись кратная этому числу
-        self.every_printable = 100
+        self.every_printable = 10000
 
         # self.is_table_exists = is_table_exists
 
         if self.is_table_exists:
             request_time = time.time()
-            # print("Started 5000000 query")
+            print(f"Started db query at {time.localtime()}")
             self.domains_count = len(self.__make_db_request(F"SELECT * FROM {self.table_name}"))
             self.domains = self.__make_db_request(f"SELECT * FROM {self.table_name} LIMIT {self.domains_count} OFFSET {self.offset}")
             self.domains_count = len(self.domains)
-            # print(f"Ended 5000000 query for {time.time() - request_time} secs")
+            print(f"Ended db query for {time.time() - request_time} secs")
         else:
             self.__create_table_if_not_exists()
             self.__download_ru_domains_file_if_not_exists()
@@ -134,12 +134,10 @@ class StatusParser:
 
 
     def __make_db_request(self, sql):
-#         print(f"started '{sql}' request")
         with self.connection.cursor() as cursor:
             cursor.execute(sql)
             result = cursor.fetchall()
         self.connection.commit()
-#         print(f"ended '{sql}' request")
         return result
 
 
