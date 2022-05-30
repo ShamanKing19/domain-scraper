@@ -2,22 +2,11 @@ from genericpath import exists
 import os, time
 from urllib.request import urlretrieve
 import zipfile
-try:
-    import asyncio
-except:
-    os.system("pip install asyncio")
-try:
-    import aiohttp
-except:
-    os.system("pip install aiohttp")
-try:
-    import pymysql
-except:
-    os.system("pip install PyMySQL")
-try:
-    from dotenv import load_dotenv
-except:
-    os.system("pip install python-dotenv")
+import asyncio
+import aiohttp
+import pymysql
+from dotenv import load_dotenv
+import argparse
 
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 if os.path.exists(dotenv_path):
@@ -27,13 +16,27 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 class StatusParser:
-    def __init__(self, db_host, db_name, db_user, db_password, db_table_name, is_table_exists):
+    def __init__(self, db_host, db_name, db_user, db_password, db_table_name):
         self.download_link = "https://statonline.ru/domainlist/file?tld="
         self.archives_path = "archives"
         self.ru_archive_path = "archives/ru.zip"
         self.extracted_files_path = "archives/extracted"
         self.file_path = "archives/extracted/ru_domains.txt"
         self.zone = 'ru'
+
+        # Настройка аргумента --offset при запуске через консоль
+        self.offset = 0
+        arg_parser = argparse.ArgumentParser()
+        arg_parser.add_argument("--offset")
+        arg_parser.add_argument("--table") # 1 - table_exists = True, 0 - table_exists = False
+        args = arg_parser.parse_args()
+        if args.offset: self.offset = args.offset
+        
+        # Настройка аргумента --table при запуске через консоль
+        self.is_table_exists = True
+        if args.table:
+            self.is_table_exists = bool(int(args.table))
+
         
         self.db_host = db_host
         self.db_name = db_name
@@ -49,16 +52,22 @@ class StatusParser:
         self.step = 10000
 
         # Будет выводиться каждая запись кратная этому числу
-        self.every_printable = 10000
+        self.every_printable = 100
 
-        self.is_table_exists = is_table_exists
+        # self.is_table_exists = is_table_exists
 
-        if self.is_table_exists: 
-            self.domains = self.__make_db_request(f"SELECT * FROM {self.table_name}")
+        if self.is_table_exists:
+            request_time = time.time()
+            # print("Started 5000000 query")
+            self.domains_count = len(self.__make_db_request(F"SELECT * FROM {self.table_name}"))
+            self.domains = self.__make_db_request(f"SELECT * FROM {self.table_name} LIMIT {self.domains_count} OFFSET {self.offset}")
+            self.domains_count = len(self.domains)
+            # print(f"Ended 5000000 query for {time.time() - request_time} secs")
         else:
             self.__create_table_if_not_exists()
             self.__download_ru_domains_file_if_not_exists()
             self.domains = self.__get_rows_from_txt()
+            self.domains_count = len(self.domains)
         
 
     def run(self):
@@ -125,10 +134,12 @@ class StatusParser:
 
 
     def __make_db_request(self, sql):
+#         print(f"started '{sql}' request")
         with self.connection.cursor() as cursor:
             cursor.execute(sql)
             result = cursor.fetchall()
         self.connection.commit()
+#         print(f"ended '{sql}' request")
         return result
 
 
@@ -167,14 +178,13 @@ class StatusParser:
         
         requests = []
         start_time = time.time()
-        domains_count = len(self.domains)
 
         print(f'\n---------------------------------- Начал обработку запросов ----------------------------------\n')
-        for portion in range(start_index, domains_count+self.step, self.step):
+        for portion in range(start_index, self.domains_count+self.step, self.step):
             if portion == 0: continue # Скип первого шага
             # print(f'Создаю {self.step} задач...')
             for domain_index in range(start_index, portion):
-                if domain_index > domains_count-1: break # Фикс скипа последнего шага и index out of range error
+                if domain_index > self.domains_count-1: break # Фикс скипа последнего шага и index out of range error
                 insert_info = {
                     "domain": self.domains[domain_index]['domain'],
                     "index": self.domains[domain_index]['id'],
@@ -182,13 +192,13 @@ class StatusParser:
                     "start_time": start_time
                 }
                 requests.append(self.__insert_domain(insert_info))
-            print(f"Парсинг c {start_index} по {portion} начался")
+#             print(f"Парсинг c {start_index} по {portion} начался")
             await asyncio.gather(*requests)
-            print(f'---------------------------------- Обработано ссылок с {start_index} до {portion} за {time.time() - start_time} ---------------------------------- ')
+#             print(f'---------------------------------- Обработано ссылок с {start_index} до {portion} за {time.time() - start_time} ---------------------------------- ')
             start_index = portion
             requests.clear()
             
-        print(f'---------------------------------- Обработка заняла {time.time() - start_time} секунд ---------------------------------- ')
+        print(f'---------------------------------- Обработка {len(self.domains)} запросов заняла  {time.time() - start_time} секунд ---------------------------------- ')
 
 
 def main():
@@ -199,7 +209,7 @@ def main():
     db_table_name = 'domains'
 
 
-    status_parser = StatusParser(db_host, db_name, db_user, db_password, db_table_name, True)
+    status_parser = StatusParser(db_host, db_name, db_user, db_password, db_table_name)
     status_parser.run()
 
 
