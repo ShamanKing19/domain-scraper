@@ -1,3 +1,4 @@
+import gc
 import warnings
 from genericpath import exists
 import os
@@ -21,7 +22,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 class MixedParser:
-    def __init__(self):
+    def __init__(self, limit, offset):
         # Данные для скачивания файла
         self.download_link = "https://statonline.ru/domainlist/file?tld="
         self.archives_path = "archives"
@@ -40,16 +41,9 @@ class MixedParser:
         self.domain_emails_table_name = 'domain_emails'
         self.connection = self.__create_connection()
 
-        # Настройка аргумента --offset при запуске через консоль
-        self.offset = 0
         arg_parser = argparse.ArgumentParser()
-        arg_parser.add_argument("--offset")
-        # 1 - table_exists = True, 0 - table_exists = False
         arg_parser.add_argument("--table")
         args = arg_parser.parse_args()
-        if args.offset:
-            self.offset = int(args.offset)
-
         # Настройка аргумента --table при запуске через консоль
         self.is_table_exists = True
         if args.table:
@@ -58,18 +52,18 @@ class MixedParser:
         ### Параметры парсера ###
         # Можно разбить на connection и readtimeout
         self.timeout = 5
-        self.step = 10000
-        self.every_printable = 10
+        self.every_printable = limit
+        self.limit = limit
+        self.offset = offset
 
         # Получение списка доменов и создание таблиц
-        request_time = time.time()
+        # request_time = time.time()
         if self.is_table_exists:
-            print(f"Запрос c OFFSET={self.offset} отправлен")
-            self.domains_count = self.__make_db_request(
-                f"SELECT count(*) FROM {self.statuses_table_name}")[0]['count(*)']
-            self.domains = self.__make_db_request(
-                f"SELECT * FROM {self.statuses_table_name} LIMIT {self.domains_count} OFFSET {self.offset}")
-            print(f"Запрос выполнен за {time.time() - request_time} секунд")
+            # print(f"Запрос c OFFSET={self.offset} отправлен")
+            self.domains_count = self.__make_db_request(f"SELECT count(*) FROM {self.statuses_table_name}")[0]['count(*)']
+            self.domains = self.__make_db_request(f"SELECT * FROM {self.statuses_table_name} LIMIT {self.limit} OFFSET {self.offset}")
+            # print(f"Запрос выполнен за {time.time() - request_time} секунд")
+        # ! С файла он возьмёт сразу все 5кк+ записей
         else:
             table_creator = TableCreator()
             table_creator.create_tables()
@@ -78,7 +72,7 @@ class MixedParser:
             self.domains_count = len(self.domains)
 
 
-        # Данные для парсинга
+        # Подготовленные данные для парсинга
         self.categories = self.__make_db_request("""
                     SELECT category.name, subcategory.name, tags.tag, tags.id FROM category
                     RIGHT JOIN subcategory ON category.id = subcategory.category_id
@@ -89,21 +83,16 @@ class MixedParser:
                 """)        
         self.validator = Validator(self.categories, self.regions)
 
-        
-        
-
 
     def run(self):
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self.__parse_all_domains())
 
 
-
-    async def __save_site_info(self, id, domain, real_url, html):
+    async def __save_site_info(self, id, domain, zone, real_url, html):
         bs4 = BeautifulSoup(html, "lxml")        
     
-        valid = await self.validator.is_valid(html)
-        if not valid:  return
+        if not await self.validator.is_valid(html): return
 
         title = await self.validator.find_title(bs4)  # Возврат: string
         description = await self.validator.find_description(bs4)  # Возврат: string
@@ -114,7 +103,7 @@ class MixedParser:
         cities_via_number = await self.validator.identify_city_by_number(numbers) # Возврат: ['Город1', 'Город2', ...]
         cities_via_inn = await self.validator.identify_city_by_inn(inns) # Возврат: ['Москва', 'Калининградская область', 'Архангельская область'...]
 
-        # Тут можно попробовать убрать проверку, может быть оно не сломается
+        # * Тут можно попробовать убрать проверку, может быть оно не сломается
         if len(cities_via_inn) > 0:
             city = ",".join(cities_via_inn)
         elif len(cities_via_number) > 0:
@@ -127,8 +116,8 @@ class MixedParser:
         # TODO: Сделать запись в domains
         # Информация в таблицу domains
         self.__make_db_request(f"""
-            INSERT INTO {self.statuses_table_name} (id, domain, real_domain, status) 
-            VALUE ('{id}', '{domain}', '{real_url}', {200})
+            INSERT INTO {self.statuses_table_name} (id, domain, zone, real_domain, status) 
+            VALUE ('{id}', '{domain}', '{zone}', '{real_url}', {200})
             ON DUPLICATE KEY UPDATE real_domain='{real_url}', status=200
         """)
 
@@ -158,18 +147,19 @@ class MixedParser:
             """)
 
 
-    async def __parse_domain(self, domain_base_info):
+    async def __make_domain_request(self, domain_base_info):
         session_timeout = aiohttp.ClientTimeout(total=None, sock_connect=self.timeout, sock_read=self.timeout)
         session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False), timeout=session_timeout)
         url = "http://" + domain_base_info['domain']
         id = domain_base_info['id']
         domain = domain_base_info['domain']
+        zone = domain_base_info['zone']
         try:
             async with session.get(url, headers=self.__get_headers()) as response:
                 if response.status == 200:
                     real_url = response.url
                     html = await response.text()
-                    await self.__save_site_info(id, domain, real_url, html)
+                    await self.__save_site_info(id, domain, zone, real_url, html)
                     if id % self.every_printable == 0: print(f"{id} - {response.url}")
         except Exception as error:
             if id % self.every_printable == 0: print(f"{id} - {error}")
@@ -178,30 +168,24 @@ class MixedParser:
 
 
     async def __parse_all_domains(self):
-        start_index = 0
         requests = []
         start_time = time.time()
 
-        print(f'\n---------------------------------- Начал обработку запросов ----------------------------------\n')
-        for portion in range(start_index, self.domains_count+self.step, self.step):
-            if portion == 0: continue  # Скип первого шага
-            for domain_index in range(start_index, portion):
-                if domain_index > self.domains_count-1-self.offset: break  # Фикс скипа последнего шага и index out of range error
-                domain_base_info = {
-                    "domain": self.domains[domain_index]['domain'],
-                    "id": self.domains[domain_index]['id'],
-                    "zone": self.domains[domain_index]['zone'],
-                    "start_time": start_time
-                }
-                requests.append(self.__parse_domain(domain_base_info))
-            print(f"Парсинг c {start_index} по {portion} начался")
-            await asyncio.gather(*requests)
-            print(f'---------------------------------- Обработано ссылок с {start_index} до {portion} за {time.time() - start_time} ---------------------------------- ')
-            start_index = portion
-            requests.clear()
+        # print(f'\n---------------------------------- Начал обработку запросов ----------------------------------\n')
+        for domain in self.domains:
+            domain_base_info = {
+                "domain": domain['domain'],
+                "id": domain['id'],
+               "zone": domain['zone'],
+               "start_time": start_time
+            }
+            requests.append(self.__make_domain_request(domain_base_info))
+        print(f"Парсинг {self.offset} по {self.offset+self.limit} начался")
+        await asyncio.gather(*requests)
+        requests.clear()
 
-        print(
-            f'---------------------------------- Обработка {len(self.domains)} запросов заняла  {time.time() - start_time} секунд ---------------------------------- ')
+        print(f'---------------------------------- Обработка {self.domains_count} запросов заняла  {time.time() - start_time} секунд ---------------------------------- ')
+
 
     def __download_ru_domains_file_if_not_exists(self):
         if (exists(self.file_path)):
@@ -265,10 +249,18 @@ class MixedParser:
 
 
 def main():
-
-    status_parser = MixedParser()
-    status_parser.run()
-
+    domains_count = 1000000#MixedParser.make_db_request("SELECT count(*) FROM domains") # Тут нужно передавать количество всех записей
+    portion = 10000 # Это одновременно обрабатываемая порция
+    start_time = time.time() 
+    
+    for offset in range(0, domains_count, portion):
+        status_parser = MixedParser(portion, offset)
+        # ! Понять как работает asyncio.wait
+        asyncio.wait(status_parser.run())
+        del status_parser
+        gc.collect()
+        
+    print(f"Парсинг закончился за {time.time() - start_time}")
 
 if __name__ == "__main__":
     main()
