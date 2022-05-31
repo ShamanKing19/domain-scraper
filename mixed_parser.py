@@ -63,7 +63,7 @@ class MixedParser:
             self.domains_count = self.__make_db_request(f"SELECT count(*) FROM {self.statuses_table_name}")[0]['count(*)']
             self.domains = self.__make_db_request(f"SELECT * FROM {self.statuses_table_name} LIMIT {self.limit} OFFSET {self.offset}")
             # print(f"Запрос выполнен за {time.time() - request_time} секунд")
-        # ! С файла он возьмёт сразу все 5кк+ записей
+        # TODO: Сделать чтобы в случае чтения с файла он тоже брал инфу порциями
         else:
             table_creator = TableCreator()
             table_creator.create_tables()
@@ -112,8 +112,7 @@ class MixedParser:
             city = ""
         inn = ",".join(inns)
 
-        # TODO: Записывать "Zone"
-        # TODO: Сделать запись в domains
+
         # Информация в таблицу domains
         self.__make_db_request(f"""
             INSERT INTO {self.statuses_table_name} (id, domain, zone, real_domain, status) 
@@ -150,9 +149,9 @@ class MixedParser:
     async def __make_domain_request(self, domain_base_info):
         session_timeout = aiohttp.ClientTimeout(total=None, sock_connect=self.timeout, sock_read=self.timeout)
         session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False), timeout=session_timeout)
-        url = "http://" + domain_base_info['domain']
         id = domain_base_info['id']
         domain = domain_base_info['domain']
+        url = "http://" + domain
         zone = domain_base_info['zone']
         try:
             async with session.get(url, headers=self.__get_headers()) as response:
@@ -188,12 +187,9 @@ class MixedParser:
 
 
     def __download_ru_domains_file_if_not_exists(self):
-        if (exists(self.file_path)):
-            return
-        if not (exists(self.archives_path)):
-            os.mkdir(self.archives_path)
-        if not (exists(self.extracted_files_path)):
-            os.mkdir(self.extracted_files_path)
+        if (exists(self.file_path)): return
+        if not (exists(self.archives_path)): os.mkdir(self.archives_path)
+        if not (exists(self.extracted_files_path)): os.mkdir(self.extracted_files_path)
         start_time = time.time()
         print("Началась загрузка архива с доменами...")
         urlretrieve(self.download_link, self.ru_archive_path)
@@ -205,6 +201,7 @@ class MixedParser:
         print("Файл распакован")
         os.remove(self.ru_archive_path)
         print("Архив удалён")
+
 
     def __get_rows_from_txt(self):
         domains = []
@@ -222,6 +219,7 @@ class MixedParser:
         print(f'Файл прочитан за {time.time() - start_time}')
         return domains
 
+
     def __get_headers(self):
         user_agents = {
             'User-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36',
@@ -235,10 +233,12 @@ class MixedParser:
         }
         return user_agents
 
+
     def __create_connection(self):
         connection = pymysql.connect(host=self.db_host, user=self.db_user, password=self.db_password,
                                      database=self.db_name, cursorclass=pymysql.cursors.DictCursor)
         return connection
+
 
     def __make_db_request(self, sql):
         with self.connection.cursor() as cursor:
@@ -249,17 +249,30 @@ class MixedParser:
 
 
 def main():
-    domains_count = 1000000#MixedParser.make_db_request("SELECT count(*) FROM domains") # Тут нужно передавать количество всех записей
+    connection = pymysql.connect(
+        host=os.environ.get("DB_HOST"),
+        user=os.environ.get("DB_USER"), 
+        password=os.environ.get("DB_PASSWORD"),
+        database=os.environ.get("DB_DATABASE"), 
+        cursorclass=pymysql.cursors.DictCursor
+        )
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT count(*) FROM domains")
+        result = cursor.fetchone()
+        connection.commit()
+    
+
+    domains_count = result['count(*)']
     portion = 10000 # Это одновременно обрабатываемая порция
     start_time = time.time() 
     
     for offset in range(0, domains_count, portion):
         status_parser = MixedParser(portion, offset)
-        # ! Понять как работает asyncio.wait
-        asyncio.wait(status_parser.run())
+        asyncio.wait(status_parser.run(), return_when=asyncio.ALL_COMPLETED)
         del status_parser
         gc.collect()
-        
+
     print(f"Парсинг закончился за {time.time() - start_time}")
 
 if __name__ == "__main__":
