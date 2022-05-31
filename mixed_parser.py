@@ -60,7 +60,7 @@ class MixedParser:
         # request_time = time.time()
         if self.is_table_exists:
             # print(f"Запрос c OFFSET={self.offset} отправлен")
-            self.domains_count = self.__make_db_request(f"SELECT count(*) FROM {self.statuses_table_name}")[0]['count(*)']
+            self.domains_count = self.offset + self.limit
             self.domains = self.__make_db_request(f"SELECT * FROM {self.statuses_table_name} LIMIT {self.limit} OFFSET {self.offset}")
             # print(f"Запрос выполнен за {time.time() - request_time} секунд")
         # TODO: Сделать чтобы в случае чтения с файла он тоже брал инфу порциями
@@ -97,7 +97,8 @@ class MixedParser:
         title = await self.validator.find_title(bs4)  # Возврат: string
         description = await self.validator.find_description(bs4)  # Возврат: string
         cms = await self.validator.identify_cms(html)  # Возврат: string
-        numbers, emails = await self.validator.find_contacts(bs4) # Возврат: {'mobile_numbers': [], 'emails:': []}
+        numbers = await self.validator.find_phone_numbers(bs4) # ['number1', 'number2'...]
+        emails = await self.validator.find_emails(bs4) # Возврат: {'mobile_numbers': [], 'emails:': []}
         inns = await self.validator.find_inn(bs4.text)  # Возврат: ['ИНН1', 'ИНН2', ...]
         tag_id = await self.validator.identify_category(title, description) # Возврат: id из таблицы tags
         cities_via_number = await self.validator.identify_city_by_number(numbers) # Возврат: ['Город1', 'Город2', ...]
@@ -159,9 +160,11 @@ class MixedParser:
                     real_url = response.url
                     html = await response.text()
                     await self.__save_site_info(id, domain, zone, real_url, html)
-                    if id % self.every_printable == 0: print(f"{id} - {response.url}")
+                    # if id % self.every_printable == 0: print(f"{id} - {response.url}")
         except Exception as error:
-            if id % self.every_printable == 0: print(f"{id} - {error}")
+            # if id % self.every_printable == 0: print(f"{id} - {error}")
+            # ? Тут можно вносить записи статус 404 или удалять её
+            pass
         finally:
             await session.close()
 

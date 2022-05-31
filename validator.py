@@ -1,4 +1,5 @@
 import re
+from bs4 import BeautifulSoup
 import phonenumbers
 from phonenumbers import geocoder
 from phonenumbers import carrier
@@ -48,10 +49,10 @@ class Validator():
             return list(set(cities))
 
 
-    async def find_inn(self, text):
+    async def find_inn(self, bs4):
         # TODO: Отсечь личшние символы вначале и в конце, потому что схватывает рандомные числа из ссылок
         ideal_pattern = re.compile('\b\d{4}\d{6}\d{2}\\b|\\b\d{4}\d{5}\d{1}\\b')
-        all_inns = list(set(re.findall(ideal_pattern, text)))
+        all_inns = list(set(re.findall(ideal_pattern, bs4.text)))
         correct_inns = []
 
         coefficients_10 = [2, 4, 10, 3, 5, 9, 4, 6, 8, 0]
@@ -91,27 +92,49 @@ class Validator():
             return []
 
 
+    async def find_emails(self, bs4):
+        raw_emails = []
+        valid_emails = []
+
+        links = [a for a in bs4.findAll('a', {'href': True}) if 'mailto:' in a.get('href')]
+        for a in links:
+            if a.text:
+                raw_emails.append(a.text)
+            else:
+                raw_emails.append(a.get('href').split(':')[-1])
+
+        for email in raw_emails:
+            matched_email = re.match(r"^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$", email)
+            valid_email = matched_email.string
+            valid_emails.append(valid_email)
+
+        return list(set(valid_emails))
+
+
     # TODO: Поменять регулярку для телефонов. 
     # TODO: Сохранять номера только с валидным количеством цифр (11 или 6)
     # можно искать все классы, в которых будет phone, contacts
-    async def find_contacts(self, bs4):
-        links = bs4.findAll('a')
-        mobile_numbers = []
-        emails = []
+    async def find_phone_numbers(self, bs4):
+        raw_numbers = []
+        valid_numbers = []
+
+        links = [a for a in bs4.findAll('a', {'href': True}) if 'tel:' in a.get('href')]
         for a in links:
-            for attribute in a.attrs:
-                if attribute == 'href':
-                    if 'tel:' in a[attribute]:
-                        mobile_number = a[attribute].split(':')[-1].strip().replace("%20", "")
-                        number = re.sub("[^0-9]", "", mobile_number)
-                        valid_number = re.match(r"^((8|\+7)[\- ]?)?(\(?\d{3}\)?[\- ]?)?[\d\- ]{7,10}$", number)
-                        if valid_number: mobile_numbers.append(valid_number.string)
-                    elif 'mailto:' in a[attribute]:
-                        email = a[attribute].split(':')[-1].strip()
-                        valid_email = re.match(r"^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$", email)    
-                        if valid_email: emails.append(valid_email.string)
-        # Так удаляю дубликаты
-        return list(set(mobile_numbers)),  list(set(emails))
+            if a.text:
+                raw_numbers.append(a.text)
+            else:
+                raw_numbers.append(a.get('href').split(':')[-1])
+
+        for number in raw_numbers:
+            no_symbols_number = re.sub("[^0-9]", "", number)
+            matched_number = re.match(r"^((8|\+7)[\- ]?)?(\(?\d{3}\)?[\- ]?)?[\d\- ]{7,10}$", no_symbols_number)
+            valid_number = matched_number.string
+            # if len(valid_number) == 11 or (valid_number) == 6: valid_numbers.append(valid_number)
+            valid_numbers.append(valid_number)
+
+        return list(set(valid_numbers))
+        
+
 
 
     async def identify_cms(self, html):
@@ -140,9 +163,9 @@ class Validator():
         invalid_keywords = ['reg.ru', 'линковка', 'купить домен', 'домен припаркован', 'только что создан', 'сайт создан', 'сайт в разработке', 'приобрести домен',
                             'получить домен', 'получи домен', 'домен продаётся', 'domain for sale', 'домен продается', 'домен продаётся', 'доступ ограничен',
                             'домен недоступен', 'домен временно недоступен', 'вы владелец сайта?', 'технические работы', 'сайт отключен', 'сайт заблокирован',
-                            'сайт недоступен', 'это тестовый сервер', 'это тестовый сайт', 'срок регистрации', 'the site is',
-                            '503 service', '404 not found', 'fatal error', 'настройте домен', 'under construction',  'не опубликован',
-                            'домен зарегистрирован', 'доступ ограничен', 'welcome to nginx', 'owner of this ', 'Купите короткий домен', 'порно'
+                            'сайт недоступен', 'это тестовый сервер', 'это тестовый сайт', 'срок регистрации', 'the site is', '503 service', '404 not found',
+                             'fatal error', 'настройте домен', 'under construction',  'не опубликован', 'домен зарегистрирован', 'доступ ограничен', 'welcome to nginx', 
+                             'owner of this ', 'Купите короткий домен', 'порно', 'porn', 'sex','секс'
                             ]
         for keyword in invalid_keywords:
             if keyword in text:
