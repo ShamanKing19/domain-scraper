@@ -115,9 +115,11 @@ class Validator():
     # TODO: Сохранять номера только с валидным количеством цифр (11 или 6)
     # можно искать все классы, в которых будет phone, contacts
     async def find_phone_numbers(self, bs4):
-        raw_numbers = []
+        # Поиск номеров в тексте
+        raw_numbers = re.findall(r"(\+[\s\-\(\)0-9]+)", bs4.text)
         valid_numbers = []
 
+        # Поиск номеров в тэгах
         links = [a for a in bs4.findAll('a', {'href': True}) if 'tel:' in a.get('href')]
         for a in links:
             if a.text:
@@ -125,16 +127,13 @@ class Validator():
             else:
                 raw_numbers.append(a.get('href').split(':')[-1])
 
-        for number in raw_numbers:
-            no_symbols_number = re.sub("[^0-9]", "", number)
+        for raw_number in raw_numbers:
+            no_symbols_number = re.sub("[^0-9]", "", raw_number)
             matched_number = re.match(r"^((8|\+7)[\- ]?)?(\(?\d{3}\)?[\- ]?)?[\d\- ]{7,10}$", no_symbols_number)
-            valid_number = matched_number.string
-            # if len(valid_number) == 11 or (valid_number) == 6: valid_numbers.append(valid_number)
-            valid_numbers.append(valid_number)
+            if matched_number: valid_numbers.append(matched_number.string)
 
         return list(set(valid_numbers))
         
-
 
 
     async def identify_cms(self, html):
