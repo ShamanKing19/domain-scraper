@@ -49,10 +49,10 @@ class Validator():
             return list(set(cities))
 
 
+    # Бесплатное API для проверки организации по ИНН
+    # https://htmlweb.ru/service/organization_api.php#api
     async def find_inn(self, bs4):
-        # TODO: Отсечь личшние символы вначале и в конце, потому что схватывает рандомные числа из ссылок
-        ideal_pattern = re.compile('\b\d{4}\d{6}\d{2}\\b|\\b\d{4}\d{5}\d{1}\\b')
-        all_inns = list(set(re.findall(ideal_pattern, bs4.text)))
+        all_inns = list(set(re.findall(r'\b\d{4}\d{6}\d{2}\b|\b\d{4}\d{5}\d{1}\b', bs4.text)))
         correct_inns = []
 
         coefficients_10 = [2, 4, 10, 3, 5, 9, 4, 6, 8, 0]
@@ -93,7 +93,8 @@ class Validator():
 
 
     async def find_emails(self, bs4):
-        raw_emails = []
+        # Поиск по тексту
+        raw_emails = re.findall(r"\b[a-z0-9._-]+@[a-z0-9-]+\b\.[a-z]*", bs4.text)
         valid_emails = []
 
         links = [a for a in bs4.findAll('a', {'href': True}) if 'mailto:' in a.get('href')]
