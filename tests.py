@@ -97,6 +97,19 @@ class Tests(unittest.IsolatedAsyncioTestCase):
                 self.assertListEqual(sorted(result), sorted(tests[url]))
 
 
+    async def test_identify_tag(self):
+        tests = {
+            "http://1profnastil.ru/": 32,
+            "http://www.blamperfo.ru/": 0,
+            "http://cbunalog.ru": 60,
+            "http://3cpt.ru": 61,
+
+        }
+        for url in tests:
+            with self.subTest(url):
+                bs4 = self.get_bs4(url)
+                result = await self.validator.identify_category(await self.validator.find_title(bs4), await self.validator.find_title(bs4))
+                self.assertEqual(result, tests[url])
 
 
     def get_bs4(self, url):

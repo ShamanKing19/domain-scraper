@@ -17,7 +17,7 @@ class Validator():
         # tags = []
         for item in self.categories:
             for tag in item['tag'].split(','):
-                if tag in title or tag in description:
+                if re.search(fr"\b{tag}\b", title + " " + description):
                     # print(f'Совпало по ключевому слову: {tag}')
                     return item['id']
                     #Это если надо будет добавлять список ключевых слов от разных подкатегорий
