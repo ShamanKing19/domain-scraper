@@ -10,9 +10,15 @@ class Validator():
         self.categories = categories
         self.subcategories = categories
         self.regions = regions
+        
+        self.re_numbers_template = re.compile(r"(\+[\s\-\(\)0-9]+)")
+        self.re_match_numbers_template = re.compile(r"^((8|\+7)[\- ]?)?(\(?\d{3}\)?[\- ]?)?[\d\- ]{7,10}$")
+        self.re_sub_number_template = re.compile(r"[^0-9]")
+        self.re_emails_template = re.compile(r"\b[a-z0-9._-]+@[a-z0-9-]+\b\.[a-z]*")
+        self.re_match_emails_template = re.compile(r"^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$")
+        self.re_inn_template = re.compile(r'\b\d{4}\d{6}\d{2}\b|\b\d{4}\d{5}\d{1}\b')
 
-# TODO: сделать чтобы искало только отдельным словам, а не по вхождениям
-    # TODO: То есть сделать регулярку вместо "for tag in title"... 
+
     async def identify_category(self, title, description):
         # tags = []
         for item in self.categories:
@@ -41,18 +47,18 @@ class Validator():
             for number in numbers:
                 valid_number = phonenumbers.parse(number, "RU")
                 location = geocoder.description_for_number(valid_number, "ru")
-                operator = carrier.name_for_number(valid_number, "en")
+                # operator = carrier.name_for_number(valid_number, "en")
                 cities.append(location)
-        except:
-            print(numbers)
+        except Exception as error:
+            print(f"{error}\n{numbers}")
         finally:
             return list(set(cities))
 
 
-    # Бесплатное API для проверки организации по ИНН
+    # TODO: Бесплатное API для проверки организации по ИНН
     # https://htmlweb.ru/service/organization_api.php#api
     async def find_inn(self, bs4):
-        all_inns = list(set(re.findall(r'\b\d{4}\d{6}\d{2}\b|\b\d{4}\d{5}\d{1}\b', bs4.text)))
+        all_inns = list(set(re.findall(self.re_inn_template, bs4.text)))
         correct_inns = []
 
         coefficients_10 = [2, 4, 10, 3, 5, 9, 4, 6, 8, 0]
@@ -94,7 +100,7 @@ class Validator():
 
     async def find_emails(self, bs4):
         # Поиск по тексту
-        raw_emails = re.findall(r"\b[a-z0-9._-]+@[a-z0-9-]+\b\.[a-z]*", bs4.text)
+        raw_emails = re.findall(self.re_emails_template, bs4.text)
         valid_emails = []
 
         links = [a for a in bs4.findAll('a', {'href': True}) if 'mailto:' in a.get('href')]
@@ -105,19 +111,16 @@ class Validator():
                 raw_emails.append(a.get('href').split(':')[-1])
 
         for email in raw_emails:
-            matched_email = re.match(r"^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$", email)
+            matched_email = re.match(self.re_match_emails_template, email)
             valid_email = matched_email.string
             valid_emails.append(valid_email)
 
         return list(set(valid_emails))
 
 
-    # TODO: Поменять регулярку для телефонов. 
-    # TODO: Сохранять номера только с валидным количеством цифр (11 или 6)
-    # можно искать все классы, в которых будет phone, contacts
     async def find_phone_numbers(self, bs4):
         # Поиск номеров в тексте
-        raw_numbers = re.findall(r"(\+[\s\-\(\)0-9]+)", bs4.text)
+        raw_numbers = re.findall(self.re_numbers_template, bs4.text)
         valid_numbers = []
 
         # Поиск номеров в тэгах
@@ -129,13 +132,12 @@ class Validator():
                 raw_numbers.append(a.get('href').split(':')[-1])
 
         for raw_number in raw_numbers:
-            no_symbols_number = re.sub("[^0-9]", "", raw_number)
-            matched_number = re.match(r"^((8|\+7)[\- ]?)?(\(?\d{3}\)?[\- ]?)?[\d\- ]{7,10}$", no_symbols_number)
+            no_symbols_number = re.sub(self.re_sub_number_template, "", raw_number)
+            matched_number = re.match(self.re_match_numbers_template, no_symbols_number)
             if matched_number: valid_numbers.append(matched_number.string)
 
         return list(set(valid_numbers))
         
-
 
     async def identify_cms(self, html):
         cms_keywords = {
