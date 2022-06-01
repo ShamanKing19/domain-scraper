@@ -124,16 +124,16 @@ class MixedParser:
 
         # Информация в таблицу domain_info
         self.__make_db_request(f"""
-            INSERT INTO {self.domain_info_table_name} (id, domain_id, title, description, city, inn, cms, tag_id) 
-            VALUE ({id}, {id}, '{title}', '{description}', '{city}', '{inn}', '{cms}', {tag_id})
+            INSERT INTO {self.domain_info_table_name} (domain_id, title, description, city, inn, cms, tag_id) 
+            VALUE ({id}, '{title}', '{description}', '{city}', '{inn}', '{cms}', {tag_id})
             ON DUPLICATE KEY UPDATE title='{title}', description='{description}', city='{city}', inn='{inn}', cms='{cms}', tag_id={tag_id}
         """)
 
         # Информация в таблицу domain_phones
         for number in numbers:
             self.__make_db_request(f"""
-                INSERT INTO {self.domain_phones_table_name} (id, domain_id, number) 
-                VALUE ({id}, {id}, {number})
+                INSERT INTO {self.domain_phones_table_name} (domain_id, number) 
+                VALUE ({id}, {number})
                 ON DUPLICATE KEY UPDATE number='{number}'
             """)
 
@@ -141,8 +141,8 @@ class MixedParser:
         for email in emails:
             email = email.strip()
             self.__make_db_request(f"""
-                INSERT INTO {self.domain_emails_table_name} (id, domain_id, email) 
-                VALUE ({id}, {id}, '{email}')
+                INSERT INTO {self.domain_emails_table_name} (domain_id, email) 
+                VALUE ({id}, '{email}')
                 ON DUPLICATE KEY UPDATE email='{email}'
             """)
 

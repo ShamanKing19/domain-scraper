@@ -1,9 +1,18 @@
+import os
 import re
+import warnings
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 import phonenumbers
 from phonenumbers import geocoder
 from phonenumbers import carrier
 from phonenumbers import timezone
+
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+if os.path.exists(dotenv_path):
+    load_dotenv(dotenv_path)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 
 class Validator():
     def __init__(self, categories, regions):

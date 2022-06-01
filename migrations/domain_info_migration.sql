@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS `domain_info` (
-    `id` BIGINT UNSIGNED PRIMARY KEY,
+    `id` BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
     `domain_id` BIGINT UNSIGNED UNIQUE,
     `title` TEXT,
     `description` TEXT,
