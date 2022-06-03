@@ -52,7 +52,7 @@ class MixedParser:
         ### Параметры парсера ###
         # Можно разбить на connection и readtimeout
         self.timeout = 5
-        self.every_printable = limit
+        self.every_printable = 1
         self.limit = limit
         self.offset = offset
 
@@ -61,7 +61,7 @@ class MixedParser:
         if self.is_table_exists:
             # print(f"Запрос c OFFSET={self.offset} отправлен")
             self.domains_count = self.offset + self.limit
-            self.domains = self.__make_db_request(f"SELECT * FROM {self.statuses_table_name} LIMIT {self.limit} OFFSET {self.offset}")
+            self.domains = self.__make_db_request(f"SELECT * FROM {self.statuses_table_name} WHERE id > {self.offset} LIMIT {self.limit}")
             # print(f"Запрос выполнен за {time.time() - request_time} секунд")
         # TODO: Сделать чтобы в случае чтения с файла он тоже брал инфу порциями
         else:
@@ -160,10 +160,11 @@ class MixedParser:
                     real_url = response.url
                     html = await response.text()
                     await self.__save_site_info(id, domain, zone, real_url, html)
-                    # if id % self.every_printable == 0: print(f"{id} - {response.url}")
+                    if id % self.every_printable == 0: print(f"{id} - {response.url}")
         except Exception as error:
-            # if id % self.every_printable == 0: print(f"{id} - {error}")
+            if id % self.every_printable == 0: print(f"{id} - {error}")
             # ? Тут можно вносить записи статус 404 или удалять её
+            # print(error)
             pass
         finally:
             await session.close()
@@ -261,16 +262,25 @@ def main():
         )
 
     with connection.cursor() as cursor:
+        # Количество url'ов
         cursor.execute("SELECT count(*) FROM domains")
         result = cursor.fetchone()
+        domains_count = result['count(*)']
+        
+        # Первый id
+        cursor.execute("SELECT id FROM domains LIMIT 1")
+        result = cursor.fetchone()
+        first_id = result['id']
         connection.commit()
-    
 
-    domains_count = result['count(*)']
+
     portion = 10000 # Это одновременно обрабатываемая порция
     start_time = time.time() 
     
-    for offset in range(0, domains_count, portion):
+    # ! Этим параметром можно задать начальный Offset
+    offset = 250
+    start_index = first_id + offset
+    for offset in range(start_index, domains_count, portion):
         status_parser = MixedParser(portion, offset)
         asyncio.wait(status_parser.run(), return_when=asyncio.ALL_COMPLETED)
         del status_parser
