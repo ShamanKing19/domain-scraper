@@ -8,7 +8,7 @@ from phonenumbers import geocoder
 from phonenumbers import carrier
 from phonenumbers import timezone
 
-dotenv_path = os.path.join(os.path.dirname(__file__), '.env")
+dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
 if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -157,17 +157,17 @@ class Validator():
 
     async def identify_cms(self, html):
         cms_keywords = {
-            "<link href="/bitrix/js/main": "Bitrix",
-            "/wp-content/themes/":  "Wordpress",
-            "<meta name="modxru"":  "ModX",
-            "<script type="text/javascript" src="/netcat":  "Netcat",
-            "<script src="/phpshop":  "PhpShop",
-            "<script type="text/x-magento-init":  "Magento",
-            "/wa-data/public": "Shop-Script",
-            "catalog/view/theme":  "OpenCart",
-            "data-drupal-":  "Drupal",
-            "<meta name="generator" content="Joomla":  "Joomla",
-            "var dle_admin": "DataLife Engine"
+            '<link href="/bitrix/js/main": "Bitrix',
+            '/wp-content/themes/":  "Wordpress',
+            '<meta name="modxru"":  "ModX',
+            '<script type="text/javascript" src="/netcat":  "Netcat',
+            '<script src="/phpshop":  "PhpShop',
+            '<script type="text/x-magento-init":  "Magento',
+            '/wa-data/public": "Shop-Script',
+            'catalog/view/theme":  "OpenCart',
+            'data-drupal-":  "Drupal',
+            '<meta name="generator" content="Joomla":  "Joomla',
+            'var dle_admin": "DataLife Engine'
         }
         for keyword in cms_keywords:
             if keyword in html:
