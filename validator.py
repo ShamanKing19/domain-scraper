@@ -122,8 +122,9 @@ class Validator():
 
         for email in raw_emails:
             matched_email = re.match(self.re_match_emails_template, email)
-            valid_email = matched_email.string
-            valid_emails.append(valid_email)
+            if matched_email:
+                valid_email = matched_email.string
+                valid_emails.append(valid_email)
 
         return list(set(valid_emails))
 

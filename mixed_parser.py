@@ -41,18 +41,18 @@ class MixedParser:
         self.domain_emails_table_name = 'domain_emails'
         self.connection = self.__create_connection()
 
-        arg_parser = argparse.ArgumentParser()
-        arg_parser.add_argument("--table")
-        args = arg_parser.parse_args()
+        # arg_parser = argparse.ArgumentParser()
+        # arg_parser.add_argument("--table")
+        # args = arg_parser.parse_args()
         # Настройка аргумента --table при запуске через консоль
         self.is_table_exists = True
-        if args.table:
-            self.is_table_exists = bool(int(args.table))
+        # if args.table:
+            # self.is_table_exists = bool(int(args.table))
 
         ### Параметры парсера ###
         # Можно разбить на connection и readtimeout
         self.timeout = 5
-        self.every_printable = 1
+        self.every_printable = 100
         self.limit = limit
         self.offset = offset
 
@@ -149,7 +149,7 @@ class MixedParser:
 
     async def __make_domain_request(self, domain_base_info):
         session_timeout = aiohttp.ClientTimeout(total=None, sock_connect=self.timeout, sock_read=self.timeout)
-        session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False), timeout=session_timeout)
+        session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False), timeout=session_timeout, trust_env=True)
         id = domain_base_info['id']
         domain = domain_base_info['domain']
         url = "http://" + domain
@@ -161,11 +161,33 @@ class MixedParser:
                     html = await response.text()
                     await self.__save_site_info(id, domain, zone, real_url, html)
                     if id % self.every_printable == 0: print(f"{id} - {response.url}")
+                
+                elif response.status:
+                    self.__make_db_request(f"""
+                        UPDATE {self.statuses_table_name} 
+                        SET status={response.status}
+                        WHERE id = {id}    
+                    """)
+                    if id % self.every_printable == 0: print(f"{id} - {response.status}")
+        
         except Exception as error:
+            # ! На таймаут ставлю 408 status
+            # ! Timeout = 408 status
+            if "timeout" in str(error):
+                self.__make_db_request(f"""
+                    UPDATE {self.statuses_table_name}
+                    SET status = 408
+                    WHERE id = {id}
+                """)
+            else:
+                # Остальным ошибкам ставлю 404-й статус
+                self.__make_db_request(f"""
+                    UPDATE {self.statuses_table_name}
+                    SET status = 404
+                    WHERE id = {id}
+                """)
             if id % self.every_printable == 0: print(f"{id} - {error}")
-            # ? Тут можно вносить записи статус 404 или удалять её
-            # print(error)
-            pass
+
         finally:
             await session.close()
 
@@ -183,7 +205,7 @@ class MixedParser:
                "start_time": start_time
             }
             requests.append(self.__make_domain_request(domain_base_info))
-        print(f"Парсинг {self.offset} по {self.offset+self.limit} начался")
+        print(f"Парсинг с {self.offset} по {self.offset+self.limit} начался")
         await asyncio.gather(*requests)
         requests.clear()
 
@@ -253,13 +275,18 @@ class MixedParser:
 
 
 def main():
+    # Настройка аргумента --table при запуске через консоль
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument("--offset")
+    args = arg_parser.parse_args()
+    
     connection = pymysql.connect(
         host=os.environ.get("DB_HOST"),
         user=os.environ.get("DB_USER"), 
         password=os.environ.get("DB_PASSWORD"),
         database=os.environ.get("DB_DATABASE"), 
         cursorclass=pymysql.cursors.DictCursor
-        )
+    )
 
     with connection.cursor() as cursor:
         # Количество url'ов
@@ -268,7 +295,7 @@ def main():
         domains_count = result['count(*)']
         
         # Первый id
-        cursor.execute("SELECT id FROM domains LIMIT 1")
+        cursor.execute("SELECT id FROM domains ORDER BY id ASC LIMIT 1")
         result = cursor.fetchone()
         first_id = result['id']
         connection.commit()
@@ -278,8 +305,11 @@ def main():
     start_time = time.time() 
     
     # ! Этим параметром можно задать начальный Offset
-    offset = 250
+    offset = 0
+    if args.offset:
+        offset = int(args.offset)
     start_index = first_id + offset
+    print(f"Первый id = {first_id}")
     for offset in range(start_index, domains_count, portion):
         status_parser = MixedParser(portion, offset)
         asyncio.wait(status_parser.run(), return_when=asyncio.ALL_COMPLETED)
