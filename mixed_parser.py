@@ -15,7 +15,7 @@ import argparse
 from table_creator import TableCreator
 from validator import Validator
 
-dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
 if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -36,9 +36,9 @@ class MixedParser:
         self.db_user = os.environ.get("DB_USER")
         self.db_password = os.environ.get("DB_PASSWORD")
         self.statuses_table_name = "domains"
-        self.domain_info_table_name = 'domain_info'
-        self.domain_phones_table_name = 'domain_phones'
-        self.domain_emails_table_name = 'domain_emails'
+        self.domain_info_table_name = "domain_info"
+        self.domain_phones_table_name = "domain_phones"
+        self.domain_emails_table_name = "domain_emails"
         self.connection = self.__create_connection()
 
         # arg_parser = argparse.ArgumentParser()
@@ -97,12 +97,12 @@ class MixedParser:
         title = await self.validator.find_title(bs4)  # Возврат: string
         description = await self.validator.find_description(bs4)  # Возврат: string
         cms = await self.validator.identify_cms(html)  # Возврат: string
-        numbers = await self.validator.find_phone_numbers(bs4) # ['number1', 'number2'...]
-        emails = await self.validator.find_emails(bs4) # Возврат: {'mobile_numbers': [], 'emails:': []}
-        inns = await self.validator.find_inn(bs4)  # Возврат: ['ИНН1', 'ИНН2', ...]
+        numbers = await self.validator.find_phone_numbers(bs4) # ["number1", "number2"...]
+        emails = await self.validator.find_emails(bs4) # Возврат: {"mobile_numbers": [], "emails:": []}
+        inns = await self.validator.find_inn(bs4)  # Возврат: ["ИНН1", "ИНН2", ...]
         tag_id = await self.validator.identify_category(title, description) # Возврат: id из таблицы tags
-        cities_via_number = await self.validator.identify_city_by_number(numbers) # Возврат: ['Город1', 'Город2', ...]
-        cities_via_inn = await self.validator.identify_city_by_inn(inns) # Возврат: ['Москва', 'Калининградская область', 'Архангельская область'...]
+        cities_via_number = await self.validator.identify_city_by_number(numbers) # Возврат: ["Город1", "Город2", ...]
+        cities_via_inn = await self.validator.identify_city_by_inn(inns) # Возврат: ["Москва", "Калининградская область", "Архангельская область"...]
 
         # * Тут можно попробовать убрать проверку, может быть оно не сломается
         if len(cities_via_inn) > 0:
@@ -150,10 +150,10 @@ class MixedParser:
     async def __make_domain_request(self, domain_base_info):
         session_timeout = aiohttp.ClientTimeout(total=None, sock_connect=self.timeout, sock_read=self.timeout)
         session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False), timeout=session_timeout, trust_env=True)
-        id = domain_base_info['id']
-        domain = domain_base_info['domain']
+        id = domain_base_info["id"]
+        domain = domain_base_info["domain"]
         url = "http://" + domain
-        zone = domain_base_info['zone']
+        zone = domain_base_info["zone"]
         try:
             async with session.get(url, headers=self.__get_headers()) as response:
                 if response.status == 200:
@@ -196,12 +196,12 @@ class MixedParser:
         requests = []
         start_time = time.time()
 
-        # print(f'\n---------------------------------- Начал обработку запросов ----------------------------------\n')
+        # print(f"\n---------------------------------- Начал обработку запросов ----------------------------------\n")
         for domain in self.domains:
             domain_base_info = {
-                "domain": domain['domain'],
-                "id": domain['id'],
-               "zone": domain['zone'],
+                "domain": domain["domain"],
+                "id": domain["id"],
+               "zone": domain["zone"],
                "start_time": start_time
             }
             requests.append(self.__make_domain_request(domain_base_info))
@@ -209,7 +209,7 @@ class MixedParser:
         await asyncio.gather(*requests)
         requests.clear()
 
-        print(f'---------------------------------- Обработка {self.domains_count} запросов заняла  {time.time() - start_time} секунд ---------------------------------- ')
+        print(f"---------------------------------- Обработка {self.domains_count} запросов заняла  {time.time() - start_time} секунд ---------------------------------- ")
 
 
     def __download_ru_domains_file_if_not_exists(self):
@@ -222,7 +222,7 @@ class MixedParser:
         print(f"Файл загружен за {time.time() - start_time}")
 
         print("Начата распаковка файла")
-        with zipfile.ZipFile(self.ru_archive_path, 'r') as zip_file:
+        with zipfile.ZipFile(self.ru_archive_path, "r") as zip_file:
             zip_file.extractall(self.extracted_files_path)
         print("Файл распакован")
         os.remove(self.ru_archive_path)
@@ -235,27 +235,27 @@ class MixedParser:
         counter = 0
         with open(self.file_path, "r") as file:
             for row in file:
-                row = row.split(';')
+                row = row.split(";")
                 domains.append({
                     "id": counter,
                     "domain": row[0],
                     "zone": row[1].split("-")[-1],
                 })
                 counter += 1
-        print(f'Файл прочитан за {time.time() - start_time}')
+        print(f"Файл прочитан за {time.time() - start_time}")
         return domains
 
 
     def __get_headers(self):
         user_agents = {
-            'User-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36',
-            'User-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:95.0) Gecko/20100101 Firefox/95.0',
-            'User-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36',
-            'User-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36',
-            'User-agent': 'Mozilla/5.0 (Windows NT 10.0; rv:91.0) Gecko/20100101 Firefox/91.0',
-            'User-agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0',
-            'User-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36',
-            'User-agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0'
+            "User-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
+            "User-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:95.0) Gecko/20100101 Firefox/95.0",
+            "User-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36",
+            "User-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
+            "User-agent": "Mozilla/5.0 (Windows NT 10.0; rv:91.0) Gecko/20100101 Firefox/91.0",
+            "User-agent": "Mozilla/5.0 (X11; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0",
+            "User-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36",
+            "User-agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0"
         }
         return user_agents
 
@@ -292,12 +292,12 @@ def main():
         # Количество url'ов
         cursor.execute("SELECT count(*) FROM domains")
         result = cursor.fetchone()
-        domains_count = result['count(*)']
+        domains_count = result["count(*)"]
         
         # Первый id
         cursor.execute("SELECT id FROM domains ORDER BY id ASC LIMIT 1")
         result = cursor.fetchone()
-        first_id = result['id']
+        first_id = result["id"]
         connection.commit()
 
 

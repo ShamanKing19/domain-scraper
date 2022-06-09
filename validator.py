@@ -8,7 +8,7 @@ from phonenumbers import geocoder
 from phonenumbers import carrier
 from phonenumbers import timezone
 
-dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env")
 if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -25,17 +25,22 @@ class Validator():
         self.re_sub_number_template = re.compile(r"[^0-9]")
         self.re_emails_template = re.compile(r"\b[a-z0-9._-]+@[a-z0-9-]+\b\.[a-z]*")
         self.re_match_emails_template = re.compile(r"^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$")
-        self.re_inn_template = re.compile(r'\b\d{4}\d{6}\d{2}\b|\b\d{4}\d{5}\d{1}\b')
+        self.re_inn_template = re.compile(r"\b\d{4}\d{6}\d{2}\b|\b\d{4}\d{5}\d{1}\b")
+        self.re_ooo_template = re.compile(r"")
 
 
+    async def identify_company_name(self, bs4):
+        pass
+
+    # TODO: Переделать чтобы категория определялась очень точно
     async def identify_category(self, title, description):
         # tags = []
         for item in self.categories:
-            for tag in item['tag'].split(','):
+            for tag in item["tag"].split(","):
                 # if re.search(fr"\b{tag}\b", title + " " + description): # ! Этот способ точнее, но с ним парсинг медленнее в 3 раза
                 if tag in title or tag in description:
-                    # print(f'Совпало по ключевому слову: {tag}')
-                    return item['id']
+                    # print(f"Совпало по ключевому слову: {tag}")
+                    return item["id"]
                     #Это если надо будет добавлять список ключевых слов от разных подкатегорий
                     # tags.append(tag)
         return 0
@@ -45,8 +50,8 @@ class Validator():
         result_regions = []
         for inn in inns:
             for region in self.regions:
-                if int(inn[:2]) == region['id']:
-                    result_regions.append(region['region'].strip())
+                if int(inn[:2]) == region["id"]:
+                    result_regions.append(region["region"].strip())
         return result_regions
 
 
@@ -113,12 +118,12 @@ class Validator():
         raw_emails = re.findall(self.re_emails_template, bs4.text)
         valid_emails = []
 
-        links = [a for a in bs4.findAll('a', {'href': True}) if 'mailto:' in a.get('href')]
+        links = [a for a in bs4.findAll("a", {"href": True}) if "mailto:" in a.get("href")]
         for a in links:
             if a.text:
                 raw_emails.append(a.text)
             else:
-                raw_emails.append(a.get('href').split(':')[-1])
+                raw_emails.append(a.get("href").split(":")[-1])
 
         for email in raw_emails:
             matched_email = re.match(self.re_match_emails_template, email)
@@ -135,12 +140,12 @@ class Validator():
         valid_numbers = []
 
         # Поиск номеров в тэгах
-        links = [a for a in bs4.findAll('a', {'href': True}) if 'tel:' in a.get('href')]
+        links = [a for a in bs4.findAll("a", {"href": True}) if "tel:" in a.get("href")]
         for a in links:
             if a.text:
                 raw_numbers.append(a.text)
             else:
-                raw_numbers.append(a.get('href').split(':')[-1])
+                raw_numbers.append(a.get("href").split(":")[-1])
 
         for raw_number in raw_numbers:
             no_symbols_number = re.sub(self.re_sub_number_template, "", raw_number)
@@ -152,17 +157,17 @@ class Validator():
 
     async def identify_cms(self, html):
         cms_keywords = {
-            '<link href="/bitrix/js/main': 'Bitrix',
-            '/wp-content/themes/':  'Wordpress',
-            '<meta name="modxru"':  'ModX',
-            '<script type="text/javascript" src="/netcat':  'Netcat',
-            '<script src="/phpshop':  'PhpShop',
-            '<script type="text/x-magento-init':  'Magento',
-            '/wa-data/public': 'Shop-Script',
-            'catalog/view/theme':  'OpenCart',
-            'data-drupal-':  'Drupal',
-            '<meta name="generator" content="Joomla':  'Joomla',
-            'var dle_admin': 'DataLife Engine'
+            "<link href="/bitrix/js/main": "Bitrix",
+            "/wp-content/themes/":  "Wordpress",
+            "<meta name="modxru"":  "ModX",
+            "<script type="text/javascript" src="/netcat":  "Netcat",
+            "<script src="/phpshop":  "PhpShop",
+            "<script type="text/x-magento-init":  "Magento",
+            "/wa-data/public": "Shop-Script",
+            "catalog/view/theme":  "OpenCart",
+            "data-drupal-":  "Drupal",
+            "<meta name="generator" content="Joomla":  "Joomla",
+            "var dle_admin": "DataLife Engine"
         }
         for keyword in cms_keywords:
             if keyword in html:
@@ -173,36 +178,36 @@ class Validator():
     async def is_valid(self, bs4):
         text = bs4
         valid = True
-        invalid_keywords = ['reg.ru', 'линковка', 'купить домен', 'домен припаркован', 'только что создан', 'сайт создан', 'сайт в разработке', 'приобрести домен',
-                            'получить домен', 'получи домен', 'домен продаётся', 'domain for sale', 'домен продается', 'домен продаётся', 'доступ ограничен',
-                            'домен недоступен', 'домен временно недоступен', 'вы владелец сайта?', 'технические работы', 'сайт отключен', 'сайт заблокирован',
-                            'сайт недоступен', 'это тестовый сервер', 'это тестовый сайт', 'срок регистрации', 'the site is', '503 service', '404 not found',
-                             'fatal error', 'настройте домен', 'under construction',  'не опубликован', 'домен зарегистрирован', 'доступ ограничен', 'welcome to nginx', 
-                             'owner of this ', 'Купите короткий домен', 'порно', 'porn', 'sex','секс'
+        invalid_keywords = ["reg.ru", "линковка", "купить домен", "домен припаркован", "только что создан", "сайт создан", "сайт в разработке", "приобрести домен",
+                            "получить домен", "получи домен", "домен продаётся", "domain for sale", "домен продается", "домен продаётся", "доступ ограничен",
+                            "домен недоступен", "домен временно недоступен", "вы владелец сайта?", "технические работы", "сайт отключен", "сайт заблокирован",
+                            "сайт недоступен", "это тестовый сервер", "это тестовый сайт", "срок регистрации", "the site is", "503 service", "404 not found",
+                             "fatal error", "настройте домен", "under construction",  "не опубликован", "домен зарегистрирован", "доступ ограничен", "welcome to nginx", 
+                             "owner of this ", "Купите короткий домен", "порно", "porn", "sex","секс"
                             ]
         for keyword in invalid_keywords:
             if keyword in text:
-                # print(f'Invalid cuz of: {keyword}\n')
+                # print(f"Invalid cuz of: {keyword}\n")
                 return False
         return valid
 
     # TODO: Исправить
     # Описание ещё могут засунуть в <meta name="keywords" content"тут писание" ...>
     async def find_description(self, bs4):
-        description = ''
-        meta_tags = bs4.findAll('meta')
+        description = ""
+        meta_tags = bs4.findAll("meta")
         for meta in meta_tags:
             for attribute in meta.attrs:
-                if 'description' in meta[attribute]:
-                    # TODO: Тут может вылететь ошибка если не аттрибута 'content' 
-                    description = meta['content'].replace('\n', '').replace('"', '').replace("'", '').strip()
+                if "description" in meta[attribute]:
+                    # TODO: Тут может вылететь ошибка если не аттрибута "content" 
+                    description = meta["content"].replace("\n", "").replace('"', "").replace("'", "").strip()
                     return description
-        return ''
+        return ""
 
 
     async def find_title(self, bs4):
-        title = ''
-        titles = bs4.findAll('title')
+        title = ""
+        titles = bs4.findAll("title")
         for title in titles:
-            return title.get_text().replace('\n', '').replace('"', '').replace("'", '').strip()
+            return title.get_text().replace("\n", "").replace('"', '').replace("'", '').strip()
         return title
