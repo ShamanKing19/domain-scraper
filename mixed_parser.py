@@ -1,26 +1,18 @@
-import gc
-from multiprocessing import Process
-import warnings
-from genericpath import exists
-import os
-import time
-from urllib.request import urlretrieve
-import zipfile
-import asyncio
-import aiohttp
+import os, time, zipfile
+import aiohttp, asyncio
 from bs4 import BeautifulSoup
-import pymysql
 from dotenv import load_dotenv
+from multiprocessing import Process
+from urllib.request import urlretrieve
+from genericpath import exists
 import argparse
+import warnings
 
+from db_connector import DbConnector
 from table_creator import TableCreator
 from validator import Validator
-from db_connector import DbConnector
 
-dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
-if os.path.exists(dotenv_path):
-    load_dotenv(dotenv_path)
-warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 
 
 class MixedParser:
@@ -257,36 +249,52 @@ class MixedParser:
         return user_agents
 
 
+def load_dot_env():
+    dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
+    if os.path.exists(dotenv_path):
+        load_dotenv(dotenv_path)
+
+
 
 def main():
-    # Настройка аргумента --offset при запуске через консоль
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    load_dot_env()
+
+    # Настройка аргументов при запуске через консоль
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("--offset")
+    arg_parser.add_argument("--cores")
+    arg_parser.add_argument("--portion")
     args = arg_parser.parse_args()
 
     domains_count = DbConnector().make_single_db_request("SELECT count(*) FROM domains")["count(*)"]
     first_id = DbConnector().make_single_db_request("SELECT id FROM domains ORDER BY id ASC LIMIT 1")["id"]
 
 
-    # * Одновременно обрабатываемая порция
-    portion = 2500
-    process_number = 4
     
     # * Начальный индекс для парсинга
     offset = 0
     if args.offset: offset = int(args.offset)
+    # * Количество процессов парсера
+    cores_number = 4
+    if args.cores: cores_number = int(args.cores)
+    # * Одновременно обрабатываемая порция
+    portion = 10000
+    if args.portion: portion = int(args.portion)
 
     start_index = first_id + offset
     
     start_time = time.time() 
     processes = []
 
-    for offset in range(start_index, domains_count, portion):
-        domains = DbConnector().make_db_request(f"SELECT * FROM domains WHERE id > {offset} LIMIT {portion}")    
-        process = Process(target=create_parser, args=(portion, offset, domains))
+    step = portion // cores_number + portion % cores_number
+    for offset in range(start_index, domains_count, step):
+        domains = DbConnector().make_db_request(f"SELECT * FROM domains WHERE id > {offset} LIMIT {step}") 
+        process = Process(target=create_parser, args=(step, offset, domains))
         process.start()
         processes.append(process)
-        if len(processes) == process_number:
+        # TODO: Тут скипнется шаг если записей будет меньше
+        if len(processes) == cores_number:
             for process in processes:
                 process.join()
             processes.clear()
