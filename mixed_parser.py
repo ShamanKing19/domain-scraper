@@ -1,4 +1,5 @@
 import gc
+from multiprocessing import Process
 import warnings
 from genericpath import exists
 import os
@@ -23,7 +24,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 class MixedParser:
-    def __init__(self, limit, offset, last_id = 0):
+    def __init__(self, limit, offset, domains):
         # Данные для скачивания файла
         self.download_link = "https://statonline.ru/domainlist/file?tld="
         self.archives_path = "archives"
@@ -48,14 +49,13 @@ class MixedParser:
         self.every_printable = 1000
         self.limit = limit
         self.offset = offset
-        self.last_id = last_id
 
         # Получение списка доменов и создание таблиц
         # request_time = time.time()
         if self.is_table_exists:
             # print(f"Запрос c OFFSET={self.offset} отправлен")
             self.domains_count = self.offset + self.limit
-            self.domains = self.db.make_db_request(f"SELECT * FROM {self.statuses_table_name} WHERE id > {self.offset} LIMIT {self.limit}")
+            self.domains = domains
             # print(f"Запрос выполнен за {time.time() - request_time} секунд")
         # TODO: Сделать чтобы в случае чтения с файла он тоже брал инфу порциями
         else:
@@ -202,6 +202,7 @@ class MixedParser:
             }
             requests.append(self.__make_domain_request(domain_base_info))
         print(f"Парсинг с {self.offset} по {self.offset+self.limit} начался")
+        # TODO: Разбить на 4 части и запустить 4 процесса  
         await asyncio.gather(*requests)
         requests.clear()
 
@@ -262,12 +263,14 @@ def main():
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("--offset")
     args = arg_parser.parse_args()
-    
+
     domains_count = DbConnector().make_single_db_request("SELECT count(*) FROM domains")["count(*)"]
     first_id = DbConnector().make_single_db_request("SELECT id FROM domains ORDER BY id ASC LIMIT 1")["id"]
 
-    # Это одновременно обрабатываемая порция
-    portion = 10000 
+
+    # * Одновременно обрабатываемая порция
+    portion = 2500
+    process_number = 4
     
     # * Начальный индекс для парсинга
     offset = 0
@@ -276,13 +279,25 @@ def main():
     start_index = first_id + offset
     
     start_time = time.time() 
+    processes = []
+
     for offset in range(start_index, domains_count, portion):
-        status_parser = MixedParser(portion, offset)
-        asyncio.wait(status_parser.run(), return_when=asyncio.ALL_COMPLETED)
-        del status_parser
-        gc.collect()
+        domains = DbConnector().make_db_request(f"SELECT * FROM domains WHERE id > {offset} LIMIT {portion}")    
+        process = Process(target=create_parser, args=(portion, offset, domains))
+        process.start()
+        processes.append(process)
+        if len(processes) == process_number:
+            for process in processes:
+                process.join()
+            processes.clear()
 
     print(f"Парсинг закончился за {time.time() - start_time}")
+
+
+def create_parser(portion, offset, domains):
+    parser = MixedParser(portion, offset, domains)
+    parser.run()
+
 
 if __name__ == "__main__":
     main()
