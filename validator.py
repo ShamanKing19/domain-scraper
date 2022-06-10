@@ -53,7 +53,7 @@ class Validator():
             for tag in item["tag"].split(","):
                 if tag in title or tag in description:
                     # print(f"Совпало по ключевому слову: {tag}")
-                    print(f"Времени прошло - {time.time() - s}")
+                    # print(f"Времени прошло - {time.time() - s}")
                     return item["id"]
         return 0
 
@@ -67,11 +67,15 @@ class Validator():
 
         for subcategory in self.compiled_tags_categories:
             for tag in subcategory["tag"]:
-                # text = bs4.text + "\n" + title + "\n" + description
-                text = title + "\n" + description
+                text = bs4.text + "\n" + title + "\n" + description
+                # text = title + "\n" + description
                 if re.search(tag, text):
                     # print(f"Совпадение по: {tag}")
                     rating_dict[subcategory["id"]] += 1
+        
+        if max(rating_dict) == 0:
+            return 0
+        
         return max(rating_dict, key=rating_dict.get)
 
 
@@ -86,11 +90,11 @@ class Validator():
             rating_dict[subcategory["id"]] = 0
 
         for subcategory in self.categories:
-            tags = [tag.strip() for tag in subcategory["tag"].split(',')]:
+            tags = [tag.strip() for tag in subcategory["tag"].split(',')]
             tags = "|".join(tags, )
                 # text = bs4.text + "\n" + title + "\n" + description
             text = bs4.text + "\n" + title + "\n" + description
-            if re.search(tag, text):
+            if re.search(tags, text):
                 # print(f"Совпадение по: {tag}")
                 rating_dict[subcategory["id"]] += 1
         return max(rating_dict, key=rating_dict.get)

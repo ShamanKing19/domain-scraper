@@ -14,6 +14,7 @@ import argparse
 
 from table_creator import TableCreator
 from validator import Validator
+from db_connector import DbConnector
 
 dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
 if os.path.exists(dotenv_path):
@@ -22,7 +23,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 class MixedParser:
-    def __init__(self, limit, offset):
+    def __init__(self, limit, offset, last_id = 0):
         # Данные для скачивания файла
         self.download_link = "https://statonline.ru/domainlist/file?tld="
         self.archives_path = "archives"
@@ -30,38 +31,31 @@ class MixedParser:
         self.extracted_files_path = "archives/extracted"
         self.file_path = "archives/extracted/ru_domains.txt"
 
-        # Подключение к бд
-        self.db_host = os.environ.get("DB_HOST")
-        self.db_name = os.environ.get("DB_DATABASE")
-        self.db_user = os.environ.get("DB_USER")
-        self.db_password = os.environ.get("DB_PASSWORD")
+        
         self.statuses_table_name = "domains"
         self.domain_info_table_name = "domain_info"
         self.domain_phones_table_name = "domain_phones"
         self.domain_emails_table_name = "domain_emails"
-        self.connection = self.__create_connection()
 
-        # arg_parser = argparse.ArgumentParser()
-        # arg_parser.add_argument("--table")
-        # args = arg_parser.parse_args()
-        # Настройка аргумента --table при запуске через консоль
+        self.db = DbConnector()
+        self.connection = self.db.create_connection()
+
         self.is_table_exists = True
-        # if args.table:
-            # self.is_table_exists = bool(int(args.table))
 
         ### Параметры парсера ###
         # Можно разбить на connection и readtimeout
         self.timeout = 5
-        self.every_printable = 100
+        self.every_printable = 1000
         self.limit = limit
         self.offset = offset
+        self.last_id = last_id
 
         # Получение списка доменов и создание таблиц
         # request_time = time.time()
         if self.is_table_exists:
             # print(f"Запрос c OFFSET={self.offset} отправлен")
             self.domains_count = self.offset + self.limit
-            self.domains = self.__make_db_request(f"SELECT * FROM {self.statuses_table_name} WHERE id > {self.offset} LIMIT {self.limit}")
+            self.domains = self.db.make_db_request(f"SELECT * FROM {self.statuses_table_name} WHERE id > {self.offset} LIMIT {self.limit}")
             # print(f"Запрос выполнен за {time.time() - request_time} секунд")
         # TODO: Сделать чтобы в случае чтения с файла он тоже брал инфу порциями
         else:
@@ -73,12 +67,12 @@ class MixedParser:
 
 
         # Подготовленные данные для парсинга
-        self.categories = self.__make_db_request("""
+        self.categories = self.db.make_db_request("""
                     SELECT category.name, subcategory.name, tags.tag, tags.id FROM category
                     RIGHT JOIN subcategory ON category.id = subcategory.category_id
                     INNER JOIN tags ON subcategory.id = tags.id
                 """)
-        self.regions = self.__make_db_request("""
+        self.regions = self.db.make_db_request("""
                     SELECT * FROM regions
                 """)        
         self.validator = Validator(self.categories, self.regions)
@@ -117,7 +111,7 @@ class MixedParser:
 
 
         # Информация в таблицу domains
-        self.__make_db_request(f"""
+        self.db.make_db_request(f"""
             INSERT INTO {self.statuses_table_name} (id, domain, zone, real_domain, status) 
             VALUE ('{id}', '{domain}', '{zone}', '{real_url}', {200})
             ON DUPLICATE KEY UPDATE real_domain='{real_url}', status=200
@@ -125,7 +119,7 @@ class MixedParser:
 
 
         # Информация в таблицу domain_info
-        self.__make_db_request(f"""
+        self.db.make_db_request(f"""
             INSERT INTO {self.domain_info_table_name} (domain_id, title, description, city, inn, cms, tag_id) 
             VALUE ({id}, '{title}', '{description}', '{city}', '{inn}', '{cms}', {tag_id})
             ON DUPLICATE KEY UPDATE title='{title}', description='{description}', city='{city}', inn='{inn}', cms='{cms}', tag_id={tag_id}
@@ -133,7 +127,7 @@ class MixedParser:
 
         # Информация в таблицу domain_phones
         for number in numbers:
-            self.__make_db_request(f"""
+            self.db.make_db_request(f"""
                 INSERT INTO {self.domain_phones_table_name} (domain_id, number) 
                 VALUE ({id}, {number})
                 ON DUPLICATE KEY UPDATE number='{number}'
@@ -142,7 +136,7 @@ class MixedParser:
         # Информация в таблицу domain_emails
         for email in emails:
             email = email.strip()
-            self.__make_db_request(f"""
+            self.db.make_db_request(f"""
                 INSERT INTO {self.domain_emails_table_name} (domain_id, email) 
                 VALUE ({id}, '{email}')
                 ON DUPLICATE KEY UPDATE email='{email}'
@@ -165,7 +159,7 @@ class MixedParser:
                     if id % self.every_printable == 0: print(f"{id} - {response.url}")
                 
                 elif response.status:
-                    self.__make_db_request(f"""
+                    self.db.make_db_request(f"""
                         UPDATE {self.statuses_table_name} 
                         SET status={response.status}
                         WHERE id = {id}    
@@ -176,14 +170,14 @@ class MixedParser:
             # ! На таймаут ставлю 408 status
             # ! Timeout = 408 status
             if "timeout" in str(error):
-                self.__make_db_request(f"""
+                self.db.make_db_request(f"""
                     UPDATE {self.statuses_table_name}
                     SET status = 408
                     WHERE id = {id}
                 """)
             else:
                 # Остальным ошибкам ставлю 404-й статус
-                self.__make_db_request(f"""
+                self.db.make_db_request(f"""
                     UPDATE {self.statuses_table_name}
                     SET status = 404
                     WHERE id = {id}
@@ -262,19 +256,6 @@ class MixedParser:
         return user_agents
 
 
-    def __create_connection(self):
-        connection = pymysql.connect(host=self.db_host, user=self.db_user, password=self.db_password,
-                                     database=self.db_name, cursorclass=pymysql.cursors.DictCursor)
-        return connection
-
-
-    def __make_db_request(self, sql):
-        with self.connection.cursor() as cursor:
-            cursor.execute(sql)
-            result = cursor.fetchall()
-        self.connection.commit()
-        return result
-
 
 def main():
     # Настройка аргумента --offset при запуске через консоль
@@ -282,36 +263,19 @@ def main():
     arg_parser.add_argument("--offset")
     args = arg_parser.parse_args()
     
-    connection = pymysql.connect(
-        host=os.environ.get("DB_HOST"),
-        user=os.environ.get("DB_USER"), 
-        password=os.environ.get("DB_PASSWORD"),
-        database=os.environ.get("DB_DATABASE"), 
-        cursorclass=pymysql.cursors.DictCursor
-    )
+    domains_count = DbConnector().make_single_db_request("SELECT count(*) FROM domains")["count(*)"]
+    first_id = DbConnector().make_single_db_request("SELECT id FROM domains ORDER BY id ASC LIMIT 1")["id"]
 
-    with connection.cursor() as cursor:
-        # Количество url'ов
-        cursor.execute("SELECT count(*) FROM domains")
-        result = cursor.fetchone()
-        domains_count = result["count(*)"]
-        
-        # Первый id
-        cursor.execute("SELECT id FROM domains ORDER BY id ASC LIMIT 1")
-        result = cursor.fetchone()
-        first_id = result["id"]
-        connection.commit()
-
-
-    portion = 10000 # Это одновременно обрабатываемая порция
-    start_time = time.time() 
+    # Это одновременно обрабатываемая порция
+    portion = 10000 
     
     # * Начальный индекс для парсинга
     offset = 0
-    if args.offset:
-        offset = int(args.offset)
-    start_index = first_id + offset
+    if args.offset: offset = int(args.offset)
 
+    start_index = first_id + offset
+    
+    start_time = time.time() 
     for offset in range(start_index, domains_count, portion):
         status_parser = MixedParser(portion, offset)
         asyncio.wait(status_parser.run(), return_when=asyncio.ALL_COMPLETED)
