@@ -1,5 +1,7 @@
 import os
+from pprint import pprint
 import re
+import time
 import warnings
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
@@ -7,6 +9,7 @@ import phonenumbers
 from phonenumbers import geocoder
 from phonenumbers import carrier
 from phonenumbers import timezone
+import copy
 
 dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
 if os.path.exists(dotenv_path):
@@ -17,6 +20,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 class Validator():
     def __init__(self, categories, regions):
         self.categories = categories
+        self.compiled_tags_categories = self.get_compiled_tags(copy.deepcopy(categories))
         self.subcategories = categories
         self.regions = regions
         
@@ -26,24 +30,70 @@ class Validator():
         self.re_emails_template = re.compile(r"\b[a-z0-9._-]+@[a-z0-9-]+\b\.[a-z]*")
         self.re_match_emails_template = re.compile(r"^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$")
         self.re_inn_template = re.compile(r"\b\d{4}\d{6}\d{2}\b|\b\d{4}\d{5}\d{1}\b")
-        self.re_ooo_template = re.compile(r"")
+        self.re_company_template = re.compile(r"\b[ОПАЗНК]{2,3}\b\s+\b\w+\b")
 
 
     async def identify_company_name(self, bs4):
-        pass
+        return re.findall(self.re_company_template, bs4.text)
 
-    # TODO: Переделать чтобы категория определялась очень точно
+
+    def get_compiled_tags(self, categories):
+        for subcategory in categories:
+            tags = []
+            # Компиляция тэгов подкатегории
+            for tag in [tag.strip() for tag in subcategory["tag"].split(",")]:
+                tags.append(re.compile(fr"\b{tag}\b"))
+            subcategory["tag"] = tags
+        return categories
+
+
     async def identify_category(self, title, description):
-        # tags = []
+        s = time.time()
         for item in self.categories:
             for tag in item["tag"].split(","):
-                # if re.search(fr"\b{tag}\b", title + " " + description): # ! Этот способ точнее, но с ним парсинг медленнее в 3 раза
                 if tag in title or tag in description:
                     # print(f"Совпало по ключевому слову: {tag}")
+                    print(f"Времени прошло - {time.time() - s}")
                     return item["id"]
-                    #Это если надо будет добавлять список ключевых слов от разных подкатегорий
-                    # tags.append(tag)
         return 0
+
+
+    async def identify_real_category(self, bs4, title, description):
+        rating_dict = {}
+
+        # Установки начального рейтинга
+        for subcategory in self.compiled_tags_categories:
+            rating_dict[subcategory["id"]] = 0
+
+        for subcategory in self.compiled_tags_categories:
+            for tag in subcategory["tag"]:
+                # text = bs4.text + "\n" + title + "\n" + description
+                text = title + "\n" + description
+                if re.search(tag, text):
+                    # print(f"Совпадение по: {tag}")
+                    rating_dict[subcategory["id"]] += 1
+        return max(rating_dict, key=rating_dict.get)
+
+
+
+    # TODO: Попробовать как тут 
+    # ! https://stackoverflow.com/questions/3271478/check-list-of-words-in-another-string
+    async def identify_real_category_test(self, bs4, title, description):
+        rating_dict = {}
+
+        # Установки начального рейтинга
+        for subcategory in self.categories:
+            rating_dict[subcategory["id"]] = 0
+
+        for subcategory in self.categories:
+            tags = [tag.strip() for tag in subcategory["tag"].split(',')]:
+            tags = "|".join(tags, )
+                # text = bs4.text + "\n" + title + "\n" + description
+            text = bs4.text + "\n" + title + "\n" + description
+            if re.search(tag, text):
+                # print(f"Совпадение по: {tag}")
+                rating_dict[subcategory["id"]] += 1
+        return max(rating_dict, key=rating_dict.get)
 
 
     async def identify_city_by_inn(self, inns):
@@ -175,23 +225,22 @@ class Validator():
         return "" 
 
 
-    async def is_valid(self, bs4):
-        text = bs4
-        valid = True
+    async def is_valid(self, bs4, title, description):
         invalid_keywords = ["reg.ru", "линковка", "купить домен", "домен припаркован", "только что создан", "сайт создан", "сайт в разработке", "приобрести домен",
                             "получить домен", "получи домен", "домен продаётся", "domain for sale", "домен продается", "домен продаётся", "доступ ограничен",
-                            "домен недоступен", "домен временно недоступен", "вы владелец сайта?", "технические работы", "сайт отключен", "сайт заблокирован",
+                            "домен недоступен", "домен временно недоступен", "вы владелец сайта?", "пусть домен работает", "технические работы", "сайт отключен", "сайт заблокирован",
                             "сайт недоступен", "это тестовый сервер", "это тестовый сайт", "срок регистрации", "the site is", "503 service", "404 not found",
                              "fatal error", "настройте домен", "under construction",  "не опубликован", "домен зарегистрирован", "доступ ограничен", "welcome to nginx", 
                              "owner of this ", "Купите короткий домен", "порно", "porn", "sex","секс"
                             ]
         for keyword in invalid_keywords:
+            text = bs4.text + "\n" + title + "\n" + description
             if keyword in text:
                 # print(f"Invalid cuz of: {keyword}\n")
                 return False
-        return valid
+        return True
 
-    # TODO: Исправить
+
     # Описание ещё могут засунуть в <meta name="keywords" content"тут писание" ...>
     async def find_description(self, bs4):
         description = ""
@@ -199,8 +248,8 @@ class Validator():
         for meta in meta_tags:
             for attribute in meta.attrs:
                 if "description" in meta[attribute]:
-                    # TODO: Тут может вылететь ошибка если не аттрибута "content" 
-                    description = meta["content"].replace("\n", "").replace('"', "").replace("'", "").strip()
+                    if meta["content"]: description = meta["content"]
+                    description = description.replace("\n", "").replace('"', "").replace("'", "").strip()
                     return description
         return ""
 
@@ -209,5 +258,5 @@ class Validator():
         title = ""
         titles = bs4.findAll("title")
         for title in titles:
-            return title.get_text().replace("\n", "").replace('"', '').replace("'", '').strip()
+            return title.get_text().replace("\n", "").replace('"', "").replace("'", "").strip()
         return title

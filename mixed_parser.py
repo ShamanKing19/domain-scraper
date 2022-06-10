@@ -92,19 +92,21 @@ class MixedParser:
     async def __save_site_info(self, id, domain, zone, real_url, html):
         bs4 = BeautifulSoup(html, "lxml")        
     
-        if not await self.validator.is_valid(html): return
-
+        # s = time.time()
         title = await self.validator.find_title(bs4)  # Возврат: string
         description = await self.validator.find_description(bs4)  # Возврат: string
+        if not await self.validator.is_valid(bs4, title, description): return
         cms = await self.validator.identify_cms(html)  # Возврат: string
         numbers = await self.validator.find_phone_numbers(bs4) # ["number1", "number2"...]
         emails = await self.validator.find_emails(bs4) # Возврат: {"mobile_numbers": [], "emails:": []}
         inns = await self.validator.find_inn(bs4)  # Возврат: ["ИНН1", "ИНН2", ...]
         tag_id = await self.validator.identify_category(title, description) # Возврат: id из таблицы tags
+        # tag_id = await self.validator.identify_real_category(bs4, title, description) # Возврат: id из таблицы tags
         cities_via_number = await self.validator.identify_city_by_number(numbers) # Возврат: ["Город1", "Город2", ...]
         cities_via_inn = await self.validator.identify_city_by_inn(inns) # Возврат: ["Москва", "Калининградская область", "Архангельская область"...]
+        # print(f"{id} - Времени прошло - {time.time() - s}")
 
-        # * Тут можно попробовать убрать проверку, может быть оно не сломается
+        # Приоритет определения города
         if len(cities_via_inn) > 0:
             city = ",".join(cities_via_inn)
         elif len(cities_via_number) > 0:
@@ -275,7 +277,7 @@ class MixedParser:
 
 
 def main():
-    # Настройка аргумента --table при запуске через консоль
+    # Настройка аргумента --offset при запуске через консоль
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("--offset")
     args = arg_parser.parse_args()
@@ -304,12 +306,12 @@ def main():
     portion = 10000 # Это одновременно обрабатываемая порция
     start_time = time.time() 
     
-    # ! Этим параметром можно задать начальный Offset
+    # * Начальный индекс для парсинга
     offset = 0
     if args.offset:
         offset = int(args.offset)
     start_index = first_id + offset
-    print(f"Первый id = {first_id}")
+
     for offset in range(start_index, domains_count, portion):
         status_parser = MixedParser(portion, offset)
         asyncio.wait(status_parser.run(), return_when=asyncio.ALL_COMPLETED)
