@@ -13,8 +13,6 @@ from table_creator import TableCreator
 from validator import Validator
 
 
-
-
 class MixedParser:
     def __init__(self, limit, offset, domains):
         # Данные для скачивания файла
@@ -24,14 +22,13 @@ class MixedParser:
         self.extracted_files_path = "archives/extracted"
         self.file_path = "archives/extracted/ru_domains.txt"
 
-        
         self.statuses_table_name = "domains"
         self.domain_info_table_name = "domain_info"
         self.domain_phones_table_name = "domain_phones"
         self.domain_emails_table_name = "domain_emails"
 
         self.db = DbConnector()
-        self.connection = self.db.create_connection()
+        # self.connection = self.db.create_connection()
 
         self.is_table_exists = True
 
@@ -66,7 +63,7 @@ class MixedParser:
                 """)
         self.regions = self.db.make_db_request("""
                     SELECT * FROM regions
-                """)        
+                """)
         self.validator = Validator(self.categories, self.regions)
 
 
@@ -76,16 +73,16 @@ class MixedParser:
 
 
     async def __save_site_info(self, id, domain, zone, real_url, html):
-        bs4 = BeautifulSoup(html, "lxml")        
-    
+        bs4 = BeautifulSoup(html, "lxml")
+
         # s = time.time()
-        title = await self.validator.find_title(bs4)  # Возврат: string
-        description = await self.validator.find_description(bs4)  # Возврат: string
+        title = await self.validator.find_title(bs4)  # Возврат: string        
+        description = await self.validator.find_description(bs4) # Возврат: string
         if not await self.validator.is_valid(bs4, title, description): return
         cms = await self.validator.identify_cms(html)  # Возврат: string
         numbers = await self.validator.find_phone_numbers(bs4) # ["number1", "number2"...]
         emails = await self.validator.find_emails(bs4) # Возврат: {"mobile_numbers": [], "emails:": []}
-        inns = await self.validator.find_inn(bs4)  # Возврат: ["ИНН1", "ИНН2", ...]
+        inns = await self.validator.find_inn(bs4) # Возврат: ["ИНН1", "ИНН2", ...]
         tag_id = await self.validator.identify_category(title, description) # Возврат: id из таблицы tags
         # tag_id = await self.validator.identify_real_category(bs4, title, description) # Возврат: id из таблицы tags
         cities_via_number = await self.validator.identify_city_by_number(numbers) # Возврат: ["Город1", "Город2", ...]
@@ -134,10 +131,10 @@ class MixedParser:
                 ON DUPLICATE KEY UPDATE email='{email}'
             """)
 
-
     async def __make_domain_request(self, domain_base_info):
         session_timeout = aiohttp.ClientTimeout(total=None, sock_connect=self.timeout, sock_read=self.timeout)
-        session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False), timeout=session_timeout, trust_env=True)
+        connector = aiohttp.TCPConnector(ssl=False)
+        session = aiohttp.ClientSession(connector=connector, timeout=session_timeout, trust_env=True)
         id = domain_base_info["id"]
         domain = domain_base_info["domain"]
         url = "http://" + domain
@@ -145,11 +142,11 @@ class MixedParser:
         try:
             async with session.get(url, headers=self.__get_headers()) as response:
                 if response.status == 200:
-                    real_url = response.url
+                    real_url = response.host
                     html = await response.text()
                     await self.__save_site_info(id, domain, zone, real_url, html)
-                    if id % self.every_printable == 0: print(f"{id} - {response.url}")
-                
+                    if id % self.every_printable == 0: print(f"{id} - {response.host}")
+
                 elif response.status:
                     self.db.make_db_request(f"""
                         UPDATE {self.statuses_table_name} 
@@ -157,24 +154,61 @@ class MixedParser:
                         WHERE id = {id}    
                     """)
                     if id % self.every_printable == 0: print(f"{id} - {response.status}")
+
+        # status = 404
+        except (
+            aiohttp.client_exceptions.ClientConnectorError,
+            aiohttp.client_exceptions.ClientOSError,
+            ConnectionResetError,
+        ) as error:
+            self.db.make_db_request(f"""
+                UPDATE {self.statuses_table_name}
+                SET status = 404
+                WHERE id = {id}
+            """)
         
-        except Exception as error:
-            # ! На таймаут ставлю 408 status
-            # ! Timeout = 408 status
-            if "timeout" in str(error):
-                self.db.make_db_request(f"""
-                    UPDATE {self.statuses_table_name}
-                    SET status = 408
-                    WHERE id = {id}
-                """)
-            else:
-                # Остальным ошибкам ставлю 404-й статус
-                self.db.make_db_request(f"""
-                    UPDATE {self.statuses_table_name}
-                    SET status = 404
-                    WHERE id = {id}
-                """)
-            if id % self.every_printable == 0: print(f"{id} - {error}")
+        # status = 400
+        except (
+            aiohttp.client_exceptions.ClientPayloadError,
+            aiohttp.client_exceptions.ClientResponseError
+            ) as error:
+            self.db.make_db_request(f"""
+                UPDATE {self.statuses_table_name}
+                SET status = 400
+                WHERE id = {id}
+            """) 
+
+        # status TimeoutError = 408 status
+        except aiohttp.client_exceptions.ServerTimeoutError as error:
+            self.db.make_db_request(f"""
+                UPDATE {self.statuses_table_name}
+                SET status = 408
+                WHERE id = {id}
+            """)               
+
+        # status = 888
+        except (
+            UnicodeDecodeError,
+            UnicodeEncodeError,
+         ) as error:
+            self.db.make_db_request(f"""
+                UPDATE {self.statuses_table_name}
+                SET status = 888
+                WHERE id = {id}
+            """)
+
+        # TODO: Придумать как обойти это
+        # ? Сайт либо заблокироан, либо без ssl сертификата
+        except aiohttp.client_exceptions.ServerDisconnectedError as error:
+            print(f"{id} - <ServerDisconnectedError> - {error} - {url}")
+        
+        # ! На linux сервере не вылазят
+        # WinError 10038 - хз
+        # WinError 10053 - может быть рабочий сайт
+        # WinError 10054 - хз
+        except OSError as error:
+            # Она даже не печатается, потому что, скорее всего, вылазит не в файлах парсера 
+            print(f"{id} <OSError> - {error.text} - {url}")
 
         finally:
             await session.close()
@@ -189,16 +223,17 @@ class MixedParser:
             domain_base_info = {
                 "domain": domain["domain"],
                 "id": domain["id"],
-               "zone": domain["zone"],
-               "start_time": start_time
+                "zone": domain["zone"],
+                "start_time": start_time
             }
             requests.append(self.__make_domain_request(domain_base_info))
         print(f"Парсинг с {self.offset} по {self.offset+self.limit} начался")
-        # TODO: Разбить на 4 части и запустить 4 процесса  
+        # TODO: Разбить на 4 части и запустить 4 процесса
         await asyncio.gather(*requests)
         requests.clear()
 
-        print(f"---------------------------------- Обработка {self.domains_count} запросов заняла  {time.time() - start_time} секунд ---------------------------------- ")
+
+        print(f"-------- Обработка {self.domains_count} запросов заняла  {time.time() - start_time} секунд --------")
 
 
     def __download_ru_domains_file_if_not_exists(self):
@@ -255,7 +290,6 @@ def load_dot_env():
         load_dotenv(dotenv_path)
 
 
-
 def main():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     load_dot_env()
@@ -270,8 +304,6 @@ def main():
     domains_count = DbConnector().make_single_db_request("SELECT count(*) FROM domains")["count(*)"]
     first_id = DbConnector().make_single_db_request("SELECT id FROM domains ORDER BY id ASC LIMIT 1")["id"]
 
-
-    
     # * Начальный индекс для парсинга
     offset = 0
     if args.offset: offset = int(args.offset)
@@ -283,13 +315,14 @@ def main():
     if args.portion: portion = int(args.portion)
 
     start_index = first_id + offset
-    
-    start_time = time.time() 
+
+    start_time = time.time()
     processes = []
 
     step = portion // cores_number + portion % cores_number
-    for offset in range(start_index, domains_count, step):
-        domains = DbConnector().make_db_request(f"SELECT * FROM domains WHERE id > {offset} LIMIT {step}") 
+
+    for offset in range(start_index, domains_count + start_index, step):
+        domains = DbConnector().make_db_request(f"SELECT * FROM domains WHERE id >= {offset} LIMIT {step}")
         process = Process(target=create_parser, args=(step, offset, domains))
         process.start()
         processes.append(process)
@@ -299,7 +332,7 @@ def main():
                 process.join()
             processes.clear()
 
-    print(f"Парсинг закончился за {time.time() - start_time}")
+    print(f"Парсинг c {start_index} по {start_index + portion} закончился за {time.time() - start_time}")
 
 
 def create_parser(portion, offset, domains):

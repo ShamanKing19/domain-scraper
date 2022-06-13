@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS `domain_info` (
     `domain_id` BIGINT UNSIGNED UNIQUE,
     `title` TEXT,
     `description` TEXT,
-    `city` VARCHAR(255),
+    `city` TEXT,
     `inn` VARCHAR(255),
     `cms` VARCHAR(100),
     `tag_id` INT NULL,

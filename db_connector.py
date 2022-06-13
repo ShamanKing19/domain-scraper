@@ -8,9 +8,9 @@ class DbConnector:
         self.db_name = os.environ.get("DB_DATABASE")
         self.db_user = os.environ.get("DB_USER")
         self.db_password = os.environ.get("DB_PASSWORD")
-        self.connection = self.create_connection()
+        self.connection = self.__create_connection()
 
-    def create_connection(self):
+    def __create_connection(self):
         connection = pymysql.connect(host=self.db_host, user=self.db_user, password=self.db_password,
                                      database=self.db_name, cursorclass=pymysql.cursors.DictCursor)
         return connection
