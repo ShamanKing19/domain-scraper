@@ -111,17 +111,12 @@ class Validator():
 
     async def identify_city_by_number(self, numbers):
         cities = []
-        # TODO: Проверить ошибки
-        try:
-            for number in numbers:
-                valid_number = phonenumbers.parse(number, "RU")
-                location = geocoder.description_for_number(valid_number, "ru")
-                # operator = carrier.name_for_number(valid_number, "en")
-                cities.append(location)
-        except Exception as error:
-            print(f"{error}\n{numbers}")
-        finally:
-            return list(set(cities))
+        for number in numbers:
+            valid_number = phonenumbers.parse(number, "RU")
+            location = geocoder.description_for_number(valid_number, "ru")
+            # operator = carrier.name_for_number(valid_number, "en")
+            if location: cities.append(location)
+        return list(set(cities))
 
 
     # TODO: Бесплатное API для проверки организации по ИНН
@@ -245,22 +240,13 @@ class Validator():
         return True
 
 
-    # Описание ещё могут засунуть в <meta name="keywords" content"тут писание" ...>
     async def find_description(self, bs4):
-        description = ""
-        meta_tags = bs4.findAll("meta")
-        for meta in meta_tags:
-            for attribute in meta.attrs:
-                if "description" in meta[attribute]:
-                    if meta["content"]: description = meta["content"]
-                    description = description.replace("\n", "").replace('"', "").replace("'", "").strip()
-                    return description
-        return ""
-
+        description = bs4.find("meta", {"name": "description"})
+        if not description or "content" not in description.attrs.keys(): return ""
+        return description["content"].replace("\n", "").replace('"', "").replace("'", "").strip()
+        
 
     async def find_title(self, bs4):
-        title = ""
-        titles = bs4.findAll("title")
-        for title in titles:
-            return title.get_text().replace("\n", "").replace('"', "").replace("'", "").strip()
-        return title
+        title = bs4.find("title")
+        if not title: return "" 
+        return title.get_text().replace("\n", "").replace('"', "").replace("'", "").strip()
