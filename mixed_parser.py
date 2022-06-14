@@ -35,7 +35,7 @@ class MixedParser:
         ### Параметры парсера ###
         # Можно разбить на connection и readtimeout
         self.timeout = 5
-        self.every_printable = 1000
+        self.every_printable = 10000
         self.limit = limit
         self.offset = offset
 
@@ -72,13 +72,19 @@ class MixedParser:
         loop.run_until_complete(self.__parse_all_domains())
 
 
-    async def __save_site_info(self, id, domain, zone, real_url, html):
+    async def __save_site_info(self, id, domain, zone, real_domain, html):
         bs4 = BeautifulSoup(html, "lxml")
-
         # s = time.time()
         title = await self.validator.find_title(bs4)  # Возврат: string        
         description = await self.validator.find_description(bs4) # Возврат: string
-        if not await self.validator.is_valid(bs4, title, description): return
+        if not await self.validator.is_valid(bs4, title, description, id, real_domain): 
+            #! invalid site: status = 000
+            self.db.make_db_request(f"""
+                INSERT INTO {self.statuses_table_name} (id, domain, zone, real_domain, status) 
+                VALUE ('{id}', '{domain}', '{zone}', '{real_domain}', {000})
+                ON DUPLICATE KEY UPDATE real_domain='{real_domain}', status=000
+            """)
+            return
         cms = await self.validator.identify_cms(html)  # Возврат: string
         numbers = await self.validator.find_phone_numbers(bs4) # ["number1", "number2"...]
         emails = await self.validator.find_emails(bs4) # Возврат: {"mobile_numbers": [], "emails:": []}
@@ -102,8 +108,8 @@ class MixedParser:
         # Информация в таблицу domains
         self.db.make_db_request(f"""
             INSERT INTO {self.statuses_table_name} (id, domain, zone, real_domain, status) 
-            VALUE ('{id}', '{domain}', '{zone}', '{real_url}', {200})
-            ON DUPLICATE KEY UPDATE real_domain='{real_url}', status=200
+            VALUE ('{id}', '{domain}', '{zone}', '{real_domain}', {200})
+            ON DUPLICATE KEY UPDATE real_domain='{real_domain}', status=200
         """)
 
 
@@ -142,10 +148,10 @@ class MixedParser:
         try:
             async with session.get(url, headers=self.__get_headers()) as response:
                 if response.status == 200:
-                    real_url = response.host
+                    real_domain = response.host
                     html = await response.text()
-                    await self.__save_site_info(id, domain, zone, real_url, html)
-                    if id % self.every_printable == 0: print(f"{id} - {response.host}")
+                    await self.__save_site_info(id, domain, zone, real_domain, html)
+                    if id % self.every_printable == 0: print(f"{id} - {response.host} - {response.status}")
 
                 elif response.status:
                     self.db.make_db_request(f"""
@@ -184,7 +190,8 @@ class MixedParser:
                 UPDATE {self.statuses_table_name}
                 SET status = 408
                 WHERE id = {id}
-            """)               
+            """)        
+            # print(f"{id} - {url} - {error}")       
 
         # status = 888
         except (
@@ -200,8 +207,9 @@ class MixedParser:
         # TODO: Придумать как обойти это
         # ? Сайт либо заблокироан, либо без ssl сертификата
         except aiohttp.client_exceptions.ServerDisconnectedError as error:
-            print(f"{id} - <ServerDisconnectedError> - {error} - {url}")
-        
+            # print(f"{id} - <ServerDisconnectedError> - {error} - {url}")
+            pass
+
         # ! На linux сервере не вылазят
         # WinError 10038 - хз
         # WinError 10053 - может быть рабочий сайт
@@ -320,6 +328,11 @@ def main():
     processes = []
 
     step = portion // cores_number + portion % cores_number
+
+    # Для небольшого количества записей
+    if step > domains_count: 
+        step = domains_count
+        cores_number = 1
 
     for offset in range(start_index, domains_count + start_index, step):
         domains = DbConnector().make_db_request(f"SELECT * FROM domains WHERE id >= {offset} LIMIT {step}")
