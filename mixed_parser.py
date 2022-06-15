@@ -88,6 +88,8 @@ class MixedParser:
             """)
             return
         cms = await self.validator.identify_cms(html)  # Возврат: string
+        ssl = 0
+        if "https" in real_domain: ssl = 1
         numbers = await self.validator.find_phone_numbers(bs4) # ["number1", "number2"...]
         emails = await self.validator.find_emails(bs4) # Возврат: {"mobile_numbers": [], "emails:": []}
         inns = await self.validator.find_inn(bs4) # Возврат: ["ИНН1", "ИНН2", ...]
@@ -118,9 +120,9 @@ class MixedParser:
 
         # Информация в таблицу domain_info
         self.db.make_db_request(f"""
-            INSERT INTO {self.domain_info_table_name} (domain_id, title, description, city, inn, cms, tag_id) 
-            VALUE ({id}, '{title}', '{description}', '{city}', '{inn}', '{cms}', {tag_id})
-            ON DUPLICATE KEY UPDATE title='{title}', description='{description}', city='{city}', inn='{inn}', cms='{cms}', tag_id={tag_id}
+            INSERT INTO {self.domain_info_table_name} (domain_id, title, description, city, inn, cms, is_ssl, tag_id) 
+            VALUE ({id}, '{title}', '{description}', '{city}', '{inn}', '{cms}', '{ssl}', {tag_id})
+            ON DUPLICATE KEY UPDATE title='{title}', description='{description}', city='{city}', inn='{inn}', cms='{cms}', is_ssl='{ssl}', tag_id={tag_id}
         """)
 
         # Информация в таблицу domain_phones
@@ -151,7 +153,7 @@ class MixedParser:
         try:
             async with session.get(url, headers=self.__get_headers()) as response:
                 if response.status == 200:
-                    real_domain = response.host
+                    real_domain = str(response.real_url.human_repr())
                     html = await response.text()
                     await self.__save_site_info(id, domain, zone, real_domain, html)
                     if id % self.every_printable == 0: print(f"{id} - {response.host} - {response.status}")
