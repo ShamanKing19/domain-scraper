@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS `domain_info` (
     `inn` VARCHAR(255),
     `cms` VARCHAR(100),
     `is_ssl` BOOLEAN,
+    `is_www` BOOLEAN,
+    `ip` VARCHAR(20),
     `tag_id` INT NULL,
     `status` VARCHAR(30) DEFAULT 'Отсутствует',
     `comment` TEXT,
