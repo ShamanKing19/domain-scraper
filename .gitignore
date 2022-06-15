@@ -135,3 +135,4 @@ composer.phar
 archives
 __pycache__
 
+.vscode/settings.json

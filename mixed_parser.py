@@ -121,15 +121,14 @@ class MixedParser:
             ON DUPLICATE KEY UPDATE real_domain='{real_domain}', status=200
         """)
 
-        try:
-            # Информация в таблицу domain_info
-            self.db.make_db_request(f"""
-                INSERT INTO {self.domain_info_table_name} (domain_id, title, description, city, inn, cms, is_ssl, is_www, ip, tag_id) 
-                VALUE ({id}, '{title}', '{description}', '{city}', '{inn}', '{cms}', '{ssl}', '{www}', '{ip}', {tag_id})
-                ON DUPLICATE KEY UPDATE title='{title}', description='{description}', city='{city}', inn='{inn}', cms='{cms}', is_ssl='{ssl}', is_www='{www}', ip='{ip}', tag_id={tag_id}
-            """)
-        except pymysql.err.DataError as error:
-            logging.error("REQUEST ERROR - " + error)
+
+        # Информация в таблицу domain_info
+        self.db.make_db_request(f"""
+            INSERT INTO {self.domain_info_table_name} (domain_id, title, description, city, inn, cms, is_ssl, is_www, ip, tag_id) 
+            VALUE ({id}, '{title}', '{description}', '{city}', '{inn}', '{cms}', '{ssl}', '{www}', '{ip}', {tag_id})
+            ON DUPLICATE KEY UPDATE title='{title}', description='{description}', city='{city}', inn='{inn}', cms='{cms}', is_ssl='{ssl}', is_www='{www}', ip='{ip}', tag_id={tag_id}
+        """)
+
 
         # Информация в таблицу domain_phones
         for number in numbers:
@@ -214,21 +213,20 @@ class MixedParser:
                 WHERE id = {id}
             """)
 
-        # TODO: Придумать как обойти это
-        # ? Сайт либо заблокироан, либо без ssl сертификата
-        except aiohttp.client_exceptions.ServerDisconnectedError as error:
-            # print(f"{id} - <ServerDisconnectedError> - {error} - {url}")
-            pass
-
+        
+        # ! Она даже не печатается, потому что, скорее всего, вылазит не в файлах парсера 
         # ! На linux сервере не вылазят
         # WinError 10038 - хз
         # WinError 10053 - может быть рабочий сайт
         # WinError 10054 - хз
         except OSError as error:
-            # Она даже не печатается, потому что, скорее всего, вылазит не в файлах парсера 
-            print(f"{id} <OSError> - {error.text} - {url}")
+            pass
 
-        # TODO: Записывать ошибки в логи
+        # TODO: Придумать как обойти это
+        # Сайт либо заблокироан, либо без ssl сертификата
+        except aiohttp.client_exceptions.ServerDisconnectedError as error:
+            pass
+
         except (pymysql.err.ProgrammingError, pymysql.err.DataError, ValueError) as error:
             logging.error(error)
 
@@ -354,7 +352,6 @@ def main():
         process = Process(target=create_parser, args=(step, offset, domains))
         process.start()
         processes.append(process)
-        # TODO: Тут скипнется шаг если записей будет меньше
         if len(processes) == cores_number:
             for process in processes:
                 process.join()
@@ -364,7 +361,7 @@ def main():
 
 
 def create_parser(portion, offset, domains):
-    logging.basicConfig(filename="logs.log")
+    # logging.basicConfig(filename="logs.log", encoding="utf-8")
     parser = MixedParser(portion, offset, domains)
     parser.run()
 
