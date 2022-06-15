@@ -24,11 +24,10 @@ class Validator():
         self.subcategories = categories
         self.regions = regions
         
-        self.re_numbers_template = re.compile(r"(\+[\s\-\(\)0-9]+)")
-        self.re_match_numbers_template = re.compile(r"^((8|\+7)[\- ]?)?(\(?\d{3}\)?[\- ]?)?[\d\- ]{7,10}$")
+       # TODO: Довести до идеала регулярки
+        self.re_numbers_template = re.compile(r"\+?[78]{1}[\s\(-]{0,2}[0-9]{3,4}[\s\)]?[\s-]?[0-9-\s]{0,4}[0-9-\s]{0,5}")
         self.re_sub_number_template = re.compile(r"[^0-9]")
-        # self.re_emails_template = re.compile(r"\b[a-z0-9._-]+@[a-z0-9-]+\b\.[a-z]*")
-        self.re_emails_template = re.compile(r"[a-z0-9._-]+@[a-z0-9-]+\.[a-z]*\.?[a-z]*")
+        self.re_emails_template = re.compile(r"[a-zA-Z0-9\.\-_]+@[a-zA-Z]+\.[a-zA-Z]+\.?[a-zA-Z]*\.?[a-zA-Z]*")
 
         self.re_inn_template = re.compile(r"\b\d{4}\d{6}\d{2}\b|\b\d{4}\d{5}\d{1}\b")
         self.re_company_template = re.compile(r"\b[ОПАЗНК]{2,3}\b\s+\b\w+\b")
@@ -51,14 +50,14 @@ class Validator():
                 "описание сайта", "магазин доменных имен", "ставки", "ставка", 
             ],
             "content" : [
-
+                "домен зарегистрирован и припаркован"
             ]
         }
 
         compiled_banwords = {
             "title": [re.compile(fr"{word}") for word in banwords["title"]], 
             "description": [re.compile(fr"\b{word}\b") for word in banwords["description"]],
-            "content": [re.compile(fr"\b{word}\b") for word in banwords["content"]],
+            "content": [re.compile(fr"{word}") for word in banwords["content"]],
         }
         return compiled_banwords
 
@@ -224,9 +223,9 @@ class Validator():
 
         for raw_number in raw_numbers:
             no_symbols_number = re.sub(self.re_sub_number_template, "", raw_number)
-            matched_number = re.match(self.re_match_numbers_template, no_symbols_number)
-            if matched_number: valid_numbers.append(matched_number.string)
-
+            if len(no_symbols_number) == 11: 
+                if no_symbols_number[0] == 8 or no_symbols_number[0] == 7:
+                    valid_numbers.append(no_symbols_number)
         return list(set(valid_numbers))
         
 
