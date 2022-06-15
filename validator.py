@@ -18,10 +18,9 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 class Validator():
     def __init__(self, categories, regions):
-        self.categories = categories
+        self.categories = self.get_categories_with_fixed_tags(categories) 
         self.compiled_tags_categories = self.get_compiled_tags(copy.deepcopy(categories))
         self.compiled_banwords = self.get_compiled_banwords()
-        self.subcategories = categories
         self.regions = regions
         
        # TODO: Довести до идеала регулярки
@@ -43,14 +42,17 @@ class Validator():
             "title": [
                 "timeweb", "срок регистрации", "404", "403", "welcome to nginx", "сайт в разработке", "доменное имя продается", "временно недоступен", "в разработке", "сайт заблокирован", "document", "как вы здесь оказались", "under construction", "домен продается", "домен продаётся", "just a moment", "домен не прилинкован", "for sale", "домен уже", "площадке интернет", "access denied", "витрина домена", "to centos", "доменное имя", "сайт создан", "надёжно припаркован",  "купить домен",
                 "недоступен", "доступ ограничен", "вы владелец сайта", "отключен", "это тестовый", "продаётся домен", "домен не добавлен", "domain name", "не опубликован", "на технической площадке", "blank page", "припаркован", "website", "данный домен", "loading", "captcha", "домен зарегистрирован", "закрыто", "не работает", "доступ к сайту", "default page", "没有找到站点", "сайт успешно", "ещё один сайт", "который можно купить", "по умолчанию", "на реконстркции", "заглушка для сайта", "index of", "not found",
-                "хостинг vps", "файл отсутствует", "report", "без названия", 
+                "хостинг vps", "файл отсутствует", "report", "без названия", "coming Soon", "бдсм", 
                 "порно", "porn", "sex", "секс", "проститутки", "шлюхи", "хентай", 
+                "1xbet", 
             ],
             "description" : [
-                "описание сайта", "магазин доменных имен", "ставки", "ставка", 
+                "описание сайта", "магазин доменных имен", "ставки", "ставка",  "default index page",
             ],
             "content" : [
-                "домен зарегистрирован и припаркован"
+                "reg.ru", "we'll be back soon!", "пусть домен работает", "добро пожаловать в wordpress", "403 forbidden", "эта страница генерируется автоматически",
+                "цифирные домены от", "если этот сайт принадлежит вам", "этот домен продается", "account has been suspended", "сайт находится в стадии разработки",
+
             ]
         }
 
@@ -66,26 +68,27 @@ class Validator():
         for subcategory in categories:
             tags = []
             # Компиляция тэгов подкатегории
-            for tag in [tag.strip() for tag in subcategory["tag"].split(",")]:
+            for tag in subcategory["tag"]:
                 tags.append(re.compile(fr"\b{tag}\b"))
             subcategory["tag"] = tags
         return categories
 
 
-    async def identify_category(self, title, description):
-        s = time.time()
-        for item in self.categories:
-            for tag in item["tag"].split(","):
-                if tag in title or tag in description:
-                    # print(f"Совпало по ключевому слову: {tag}")
-                    # print(f"Времени прошло - {time.time() - s}")
-                    return item["id"]
+    def get_categories_with_fixed_tags(self, categories):
+        for subcategory in categories:
+            tags = [tag.strip() for tag in subcategory["tag"].split(",")]
+            subcategory["tag"] = tags
+        return categories
+
+
+    async def identify_category(self, bs4, title, description, url):
         return 0
 
 
     # ! Мегапрожорливый и медленный, но точный
-    async def identify_real_category(self, bs4, title, description):
+    async def identify_real_category(self, bs4, title, description, url):
         rating_dict = {}
+        start = time.time()
 
         # Установки начального рейтинга
         for subcategory in self.compiled_tags_categories:
@@ -94,15 +97,17 @@ class Validator():
         for subcategory in self.compiled_tags_categories:
             for tag in subcategory["tag"]:
                 text = bs4.text + "\n" + title + "\n" + description
-                # text = title + "\n" + description
                 if re.search(tag, text):
                     # print(f"Совпадение по: {tag}")
                     rating_dict[subcategory["id"]] += 1
         
         if max(rating_dict) == 0:
+            print(f"re --- 0 - {url} - {time.time() - start}")
             return 0
         
-        return max(rating_dict, key=rating_dict.get)
+        result = max(rating_dict, key=rating_dict.get)  
+        print(f"{result} - https://{url} - {time.time() - start}\n")
+        return result
 
 
     async def identify_city_by_inn(self, inns):
@@ -204,7 +209,7 @@ class Validator():
         for raw_number in raw_numbers:
             no_symbols_number = re.sub(self.re_sub_number_template, "", raw_number)
             if len(no_symbols_number) == 11: 
-                if no_symbols_number[0] == 8 or no_symbols_number[0] == 7:
+                if no_symbols_number[0] == "8" or no_symbols_number[0] == "7":
                     valid_numbers.append(no_symbols_number)
         return list(set(valid_numbers))
         
