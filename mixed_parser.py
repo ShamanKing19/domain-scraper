@@ -91,8 +91,8 @@ class MixedParser:
         numbers = await self.validator.find_phone_numbers(bs4) # ["number1", "number2"...]
         emails = await self.validator.find_emails(bs4) # Возврат: {"mobile_numbers": [], "emails:": []}
         inns = await self.validator.find_inn(bs4) # Возврат: ["ИНН1", "ИНН2", ...]
-        tag_id = await self.validator.identify_category(title, description) # Возврат: id из таблицы tags
-        # tag_id = await self.validator.identify_real_category(bs4, title, description) # Возврат: id из таблицы tags
+        # tag_id = await self.validator.identify_category(title, description) # Возврат: id из таблицы tags
+        tag_id = await self.validator.identify_real_category(bs4, title, description) # Возврат: id из таблицы tags
         # TODO: Возможно изменить тип поля city на TEXT
         cities_via_number = await self.validator.identify_city_by_number(numbers) # Возврат: ["Город1", "Город2", ...]
         cities_via_inn = await self.validator.identify_city_by_inn(inns) # Возврат: ["Москва", "Калининградская область", "Архангельская область"...]

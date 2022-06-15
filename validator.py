@@ -83,6 +83,7 @@ class Validator():
         return 0
 
 
+    # ! Мегапрожорливый и медленный, но точный
     async def identify_real_category(self, bs4, title, description):
         rating_dict = {}
 
@@ -101,27 +102,6 @@ class Validator():
         if max(rating_dict) == 0:
             return 0
         
-        return max(rating_dict, key=rating_dict.get)
-
-
-
-    # TODO: Попробовать как тут 
-    # ! https://stackoverflow.com/questions/3271478/check-list-of-words-in-another-string
-    async def identify_real_category_test(self, bs4, title, description):
-        rating_dict = {}
-
-        # Установки начального рейтинга
-        for subcategory in self.categories:
-            rating_dict[subcategory["id"]] = 0
-
-        for subcategory in self.categories:
-            tags = [tag.strip() for tag in subcategory["tag"].split(',')]
-            tags = "|".join(tags, )
-                # text = bs4.text + "\n" + title + "\n" + description
-            text = bs4.text + "\n" + title + "\n" + description
-            if re.search(tags, text):
-                # print(f"Совпадение по: {tag}")
-                rating_dict[subcategory["id"]] += 1
         return max(rating_dict, key=rating_dict.get)
 
 
