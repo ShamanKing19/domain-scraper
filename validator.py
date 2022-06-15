@@ -3,7 +3,6 @@ from pprint import pprint
 import re
 import time
 import warnings
-from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import phonenumbers
 from phonenumbers import geocoder
@@ -21,20 +20,47 @@ class Validator():
     def __init__(self, categories, regions):
         self.categories = categories
         self.compiled_tags_categories = self.get_compiled_tags(copy.deepcopy(categories))
+        self.compiled_banwords = self.get_compiled_banwords()
         self.subcategories = categories
         self.regions = regions
         
         self.re_numbers_template = re.compile(r"(\+[\s\-\(\)0-9]+)")
         self.re_match_numbers_template = re.compile(r"^((8|\+7)[\- ]?)?(\(?\d{3}\)?[\- ]?)?[\d\- ]{7,10}$")
         self.re_sub_number_template = re.compile(r"[^0-9]")
-        self.re_emails_template = re.compile(r"\b[a-z0-9._-]+@[a-z0-9-]+\b\.[a-z]*")
-        self.re_match_emails_template = re.compile(r"^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$")
+        # self.re_emails_template = re.compile(r"\b[a-z0-9._-]+@[a-z0-9-]+\b\.[a-z]*")
+        self.re_emails_template = re.compile(r"[a-z0-9._-]+@[a-z0-9-]+\.[a-z]*\.?[a-z]*")
+
         self.re_inn_template = re.compile(r"\b\d{4}\d{6}\d{2}\b|\b\d{4}\d{5}\d{1}\b")
         self.re_company_template = re.compile(r"\b[ОПАЗНК]{2,3}\b\s+\b\w+\b")
 
 
+
     async def identify_company_name(self, bs4):
         return re.findall(self.re_company_template, bs4.text)
+
+
+    def get_compiled_banwords(self):
+        banwords = {
+            "title": [
+                "timeweb", "срок регистрации", "404", "403", "welcome to nginx", "сайт в разработке", "доменное имя продается", "временно недоступен", "в разработке", "сайт заблокирован", "document", "как вы здесь оказались", "under construction", "домен продается", "домен продаётся", "just a moment", "домен не прилинкован", "for sale", "домен уже", "площадке интернет", "access denied", "витрина домена", "to centos", "доменное имя", "сайт создан", "надёжно припаркован",  "купить домен",
+                "недоступен", "доступ ограничен", "вы владелец сайта", "отключен", "это тестовый", "продаётся домен", "домен не добавлен", "domain name", "не опубликован", "на технической площадке", "blank page", "припаркован", "website", "данный домен", "loading", "captcha", "домен зарегистрирован", "закрыто", "не работает", "доступ к сайту", "default page", "没有找到站点", "сайт успешно", "ещё один сайт", "который можно купить", "по умолчанию", "на реконстркции", "заглушка для сайта", "index of", "not found",
+                "хостинг vps", "файл отсутствует", "report", "без названия", 
+                "порно", "porn", "sex", "секс", "проститутки", "шлюхи", "хентай", 
+            ],
+            "description" : [
+                "описание сайта", "магазин доменных имен", "ставки", "ставка", 
+            ],
+            "content" : [
+
+            ]
+        }
+
+        compiled_banwords = {
+            "title": [re.compile(fr"{word}") for word in banwords["title"]], 
+            "description": [re.compile(fr"\b{word}\b") for word in banwords["description"]],
+            "content": [re.compile(fr"\b{word}\b") for word in banwords["content"]],
+        }
+        return compiled_banwords
 
 
     def get_compiled_tags(self, categories):
@@ -175,10 +201,10 @@ class Validator():
                 raw_emails.append(a.get("href").split(":")[-1])
 
         for email in raw_emails:
-            matched_email = re.match(self.re_match_emails_template, email)
+            matched_email = re.match(self.re_emails_template, email)
             if matched_email:
                 valid_email = matched_email.string
-                valid_emails.append(valid_email)
+                valid_emails.append(valid_email.strip("\"\'"))
 
         return list(set(valid_emails))
 
@@ -224,19 +250,25 @@ class Validator():
         return "" 
 
 
-    async def is_valid(self, bs4, title, description):
-        invalid_keywords = ["reg.ru", "линковка", "купить домен", "домен припаркован", "прилинкован",  "только что создан", "сайт создан", "сайт в разработке", "приобрести домен",
-                            "получить домен", "получи домен", "домен продаётся", "domain for sale", "домен продается", "домен продаётся", "доступ ограничен",
-                            "домен недоступен", "домен временно недоступен", "вы владелец сайта?", "пусть домен работает", "технические работы", "сайт отключен", "сайт заблокирован",
-                            "сайт недоступен", "это тестовый сервер", "это тестовый сайт", "срок регистрации", "the site is", "503 service", "404 not found",
-                             "fatal error", "настройте домен", "under construction",  "не опубликован", "домен зарегистрирован", "доступ ограничен", "welcome to nginx", 
-                             "owner of this ", "Купите короткий домен", "порно", "porn", "sex","секс"
-                            ]
-        for keyword in invalid_keywords:
-            text = bs4.text + "\n" + title + "\n" + description
-            if keyword in text:
-                # print(f"Invalid cuz of: {keyword}\n")
+    async def is_valid(self, bs4, title, description, id, url):
+        if not title:
+            return False
+        
+        for banword in self.compiled_banwords["title"]:
+            if re.search(banword, title.lower()):
+                # print(f"{id} - invalid cuz of: {banword} - {url}")
                 return False
+
+        for banword in self.compiled_banwords["description"]:
+            if re.search(banword, description.lower()):
+                # print(f"{id} - invalid cuz of: {banword} - {url}")
+                return False
+
+        for banword in self.compiled_banwords["content"]:
+            if re.search(banword, bs4.text.lower()):
+                # print(f"{id} - invalid cuz of: {banword} - {url}")
+                return False
+            
         return True
 
 

@@ -8,6 +8,8 @@ from genericpath import exists
 import argparse
 import warnings
 
+import pymysql
+
 from db_connector import DbConnector
 from table_creator import TableCreator
 from validator import Validator
@@ -91,10 +93,12 @@ class MixedParser:
         inns = await self.validator.find_inn(bs4) # Возврат: ["ИНН1", "ИНН2", ...]
         tag_id = await self.validator.identify_category(title, description) # Возврат: id из таблицы tags
         # tag_id = await self.validator.identify_real_category(bs4, title, description) # Возврат: id из таблицы tags
+        # TODO: Возможно изменить тип поля city на TEXT
         cities_via_number = await self.validator.identify_city_by_number(numbers) # Возврат: ["Город1", "Город2", ...]
         cities_via_inn = await self.validator.identify_city_by_inn(inns) # Возврат: ["Москва", "Калининградская область", "Архангельская область"...]
         # print(f"{id} - Времени прошло - {time.time() - s}")
 
+        inn = ",".join(inns)
         # Приоритет определения города
         if len(cities_via_inn) > 0:
             city = ",".join(cities_via_inn)
@@ -102,7 +106,6 @@ class MixedParser:
             city = ",".join(cities_via_number)
         else:
             city = ""
-        inn = ",".join(inns)
 
 
         # Информация в таблицу domains
@@ -217,6 +220,12 @@ class MixedParser:
         except OSError as error:
             # Она даже не печатается, потому что, скорее всего, вылазит не в файлах парсера 
             print(f"{id} <OSError> - {error.text} - {url}")
+
+        # TODO: Записывать ошибки в логи
+        except (pymysql.err.ProgrammingError, ValueError, Exception) as error:
+            file = open("error_logs.txt", "a")
+            file.write(f"{error}\n")
+            file.close()
 
         finally:
             await session.close()
