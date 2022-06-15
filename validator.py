@@ -81,32 +81,24 @@ class Validator():
         return categories
 
 
-    async def identify_category(self, bs4, title, description, url):
-        return 0
-
-
     # ! Мегапрожорливый и медленный, но точный
-    async def identify_real_category(self, bs4, title, description, url):
+    async def identify_category(self, bs4, title, description, url):
         rating_dict = {}
-        start = time.time()
-
         # Установки начального рейтинга
         for subcategory in self.compiled_tags_categories:
             rating_dict[subcategory["id"]] = 0
-
+        
+        s = time.time()
         for subcategory in self.compiled_tags_categories:
-            for tag in subcategory["tag"]:
-                text = bs4.text + "\n" + title + "\n" + description
-                if re.search(tag, text):
-                    # print(f"Совпадение по: {tag}")
-                    rating_dict[subcategory["id"]] += 1
+                for tag in subcategory["tag"]:
+                    text = title + description + bs4.text
+                    rating_dict[subcategory["id"]] += len(re.findall(tag, text))
         
         if max(rating_dict) == 0:
-            print(f"re --- 0 - {url} - {time.time() - start}")
             return 0
         
         result = max(rating_dict, key=rating_dict.get)  
-        print(f"{result} - https://{url} - {time.time() - start}\n")
+        print(f"{result} - {time.time() - s}")
         return result
 
 
