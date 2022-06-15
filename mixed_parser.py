@@ -1,4 +1,6 @@
+import logging
 import os, time, zipfile
+import socket
 import aiohttp, asyncio
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
@@ -74,7 +76,8 @@ class MixedParser:
         loop.run_until_complete(self.__parse_all_domains())
 
 
-    async def __save_site_info(self, id, domain, zone, real_domain, html):
+    async def __save_site_info(self, id, domain, zone, response, html):
+        real_domain = str(response.real_url.human_repr())
         bs4 = BeautifulSoup(html, "lxml")
         # s = time.time()
         title = await self.validator.find_title(bs4)  # Возврат: string        
@@ -88,8 +91,9 @@ class MixedParser:
             """)
             return
         cms = await self.validator.identify_cms(html)  # Возврат: string
-        ssl = 0
-        if "https" in real_domain: ssl = 1
+        ssl = 1 if "https://" in real_domain else 0
+        www = 1 if "www." in real_domain else 0
+        ip = socket.gethostbyname(response.host)
         numbers = await self.validator.find_phone_numbers(bs4) # ["number1", "number2"...]
         emails = await self.validator.find_emails(bs4) # Возврат: {"mobile_numbers": [], "emails:": []}
         inns = await self.validator.find_inn(bs4) # Возврат: ["ИНН1", "ИНН2", ...]
@@ -117,13 +121,15 @@ class MixedParser:
             ON DUPLICATE KEY UPDATE real_domain='{real_domain}', status=200
         """)
 
-
-        # Информация в таблицу domain_info
-        self.db.make_db_request(f"""
-            INSERT INTO {self.domain_info_table_name} (domain_id, title, description, city, inn, cms, is_ssl, tag_id) 
-            VALUE ({id}, '{title}', '{description}', '{city}', '{inn}', '{cms}', '{ssl}', {tag_id})
-            ON DUPLICATE KEY UPDATE title='{title}', description='{description}', city='{city}', inn='{inn}', cms='{cms}', is_ssl='{ssl}', tag_id={tag_id}
-        """)
+        try:
+            # Информация в таблицу domain_info
+            self.db.make_db_request(f"""
+                INSERT INTO {self.domain_info_table_name} (domain_id, title, description, city, inn, cms, is_ssl, is_www, ip, tag_id) 
+                VALUE ({id}, '{title}', '{description}', '{city}', '{inn}', '{cms}', '{ssl}', '{www}', '{ip}', {tag_id})
+                ON DUPLICATE KEY UPDATE title='{title}', description='{description}', city='{city}', inn='{inn}', cms='{cms}', is_ssl='{ssl}', is_www='{www}', ip='{ip}', tag_id={tag_id}
+            """)
+        except pymysql.err.DataError as error:
+            logging.error("REQUEST ERROR - " + error)
 
         # Информация в таблицу domain_phones
         for number in numbers:
@@ -153,9 +159,8 @@ class MixedParser:
         try:
             async with session.get(url, headers=self.__get_headers()) as response:
                 if response.status == 200:
-                    real_domain = str(response.real_url.human_repr())
                     html = await response.text()
-                    await self.__save_site_info(id, domain, zone, real_domain, html)
+                    await self.__save_site_info(id, domain, zone, response, html)
                     if id % self.every_printable == 0: print(f"{id} - {response.host} - {response.status}")
 
                 elif response.status:
@@ -224,10 +229,9 @@ class MixedParser:
             print(f"{id} <OSError> - {error.text} - {url}")
 
         # TODO: Записывать ошибки в логи
-        except (pymysql.err.ProgrammingError, ValueError) as error:
-            file = open("error_logs.txt", "a")
-            file.write(f"{error}\n")
-            file.close()
+        except (pymysql.err.ProgrammingError, pymysql.err.DataError, ValueError) as error:
+            logging.error(error)
+
 
         finally:
             await session.close()
@@ -360,6 +364,7 @@ def main():
 
 
 def create_parser(portion, offset, domains):
+    logging.basicConfig(filename="logs.log")
     parser = MixedParser(portion, offset, domains)
     parser.run()
 
