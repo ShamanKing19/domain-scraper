@@ -26,7 +26,7 @@ class Validator():
        # TODO: Довести до идеала регулярки
         self.re_numbers_template = re.compile(r"\+?[78]{1}[\s\(-]{0,2}[0-9]{3,4}[\s\)]?[\s-]?[0-9-\s]{0,4}[0-9-\s]{0,5}")
         self.re_sub_number_template = re.compile(r"[^0-9]")
-        self.re_emails_template = re.compile(r"[a-zA-Z0-9\.\-_]+@[a-zA-Z]+\.[a-zA-Z]+\.?[a-zA-Z]*\.?[a-zA-Z]*")
+        self.re_emails_template = re.compile(r"[a-zA-Z0-9\.\-_]+@[a-zA-Z0-9_\-]+\.[a-zA-Z]+\.?[a-zA-Z]*\.?[a-zA-Z]*")
 
         self.re_inn_template = re.compile(r"\b\d{4}\d{6}\d{2}\b|\b\d{4}\d{5}\d{1}\b")
         self.re_company_template = re.compile(r"\b[ОПАЗНК]{2,3}\b\s+\b\w+\b")
@@ -207,17 +207,23 @@ class Validator():
 
     async def identify_cms(self, html):
         cms_keywords = {
-            '<link href="/bitrix/js/main": "Bitrix',
-            '/wp-content/themes/":  "Wordpress',
-            '<meta name="modxru"":  "ModX',
-            '<script type="text/javascript" src="/netcat":  "Netcat',
-            '<script src="/phpshop":  "PhpShop',
-            '<script type="text/x-magento-init":  "Magento',
-            '/wa-data/public": "Shop-Script',
-            'catalog/view/theme":  "OpenCart',
-            'data-drupal-":  "Drupal',
-            '<meta name="generator" content="Joomla":  "Joomla',
-            'var dle_admin": "DataLife Engine'
+            '<link href="/bitrix/js/main': "Bitrix",
+            '/wp-content/themes/':  "Wordpress",
+            '<meta name="modxru':  "ModX",
+            '<script type="text/javascript" src="/netcat':  "Netcat",
+            '<script src="/phpshop':  "PhpShop",
+            '<script type="text/x-magento-init':  "Magento",
+            '/wa-data/public': "Shop-Script",
+            'catalog/view/theme':  "OpenCart",
+            'data-drupal-':  "Drupal",
+            '<meta name="generator" content="Joomla':  "Joomla",
+            'var dle_admin': "DataLife Engine",
+            # Новые
+            'UCOZ-JS': "Ucoz",
+            '<script src="https://static.tilda': 'Tilda',
+            '<meta name="generator" content="Wix': 'Wix',
+            'href="https://nethouse.ru/?p': 'Nethouse',
+            'data-muse-uid': 'Adobe Muse'
         }
         for keyword in cms_keywords:
             if keyword in html:
