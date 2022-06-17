@@ -207,7 +207,7 @@ class Validator():
 
     async def identify_cms(self, html):
         cms_keywords = {
-            '<link href="/bitrix/js/main': "Bitrix",
+            '/bitrix/js/main': "Bitrix",
             '/wp-content/themes/':  "Wordpress",
             '<meta name="modxru':  "ModX",
             '<script type="text/javascript" src="/netcat':  "Netcat",
@@ -222,8 +222,12 @@ class Validator():
             'UCOZ-JS': "Ucoz",
             '<script src="https://static.tilda': 'Tilda',
             '<meta name="generator" content="Wix': 'Wix',
-            'href="https://nethouse.ru/?p': 'Nethouse',
-            'data-muse-uid': 'Adobe Muse'
+            'href="https://nethouse.ru/?p': 'Nethouse', #? Проверить
+            'data-muse-uid': 'Adobe Muse',
+            'img src="/images/cms/': 'UMI', #? Проверить
+            '-= Amiro.CMS (c) =-': 'Amiro',
+            'content="CMS EDGESTILE SiteEdit">': 'SiteEdit',
+            'meta name="generator" content="OkayCMS': 'Okay'
         }
         for keyword in cms_keywords:
             if keyword in html:
@@ -251,6 +255,12 @@ class Validator():
                 return False
             
         return True
+
+
+    async def find_keywords(self, bs4):
+        keywords = bs4.find("meta", {"name": "keywords"})
+        if not keywords or "content" not in keywords.attrs.keys(): return ""
+        return keywords["content"].replace("\n", "").replace('"', "").replace("'", "").strip()
 
 
     async def find_description(self, bs4):

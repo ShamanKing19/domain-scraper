@@ -1,7 +1,12 @@
 import logging
-import os, time, zipfile
+import os
+import ssl
+import time
+import zipfile
+from ssl import SSLCertVerificationError
 import socket
-import aiohttp, asyncio
+import aiohttp
+import asyncio
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from multiprocessing import Process
@@ -46,10 +51,8 @@ class MixedParser:
         # Получение списка доменов и создание таблиц
         # request_time = time.time()
         if self.is_table_exists:
-            # print(f"Запрос c OFFSET={self.offset} отправлен")
             self.domains_count = self.offset + self.limit
             self.domains = domains
-            # print(f"Запрос выполнен за {time.time() - request_time} секунд")
         # TODO: Сделать чтобы в случае чтения с файла он тоже брал инфу порциями
         else:
             table_creator = TableCreator()
@@ -57,7 +60,6 @@ class MixedParser:
             self.__download_ru_domains_file_if_not_exists()
             self.domains = self.__get_rows_from_txt()
             self.domains_count = len(self.domains)
-
 
         # Подготовленные данные для парсинга
         self.categories = self.db.make_db_request("""
@@ -76,13 +78,14 @@ class MixedParser:
         loop.run_until_complete(self.__parse_all_domains())
 
 
-    async def __save_site_info(self, id, domain, zone, response, html):
+    async def __save_site_info(self, id, domain, zone, response, is_ssl, is_https_redirect, html):
         real_domain = str(response.real_url.human_repr())
         bs4 = BeautifulSoup(html, "lxml")
+
         # s = time.time()
-        title = await self.validator.find_title(bs4)  # Возврат: string        
-        description = await self.validator.find_description(bs4) # Возврат: string
-        if not await self.validator.is_valid(bs4, title, description, id, real_domain): 
+        title = await self.validator.find_title(bs4)  
+        description = await self.validator.find_description(bs4)
+        if not await self.validator.is_valid(bs4, title, description, id, real_domain):
             #! invalid site: status = 000
             self.db.make_db_request(f"""
                 INSERT INTO {self.statuses_table_name} (id, domain, zone, real_domain, status) 
@@ -90,19 +93,17 @@ class MixedParser:
                 ON DUPLICATE KEY UPDATE real_domain='{real_domain}', status=000
             """)
             return
-        cms = await self.validator.identify_cms(html)  # Возврат: string
-        ssl = 1 if "https://" in real_domain else 0
+        keywords = await self.validator.find_keywords(bs4)
+        cms = await self.validator.identify_cms(html) 
+        numbers = await self.validator.find_phone_numbers(bs4)
+        emails = await self.validator.find_emails(bs4)
+        inns = await self.validator.find_inn(bs4)
+        cities_via_number = await self.validator.identify_city_by_number(numbers)
+        cities_via_inn = await self.validator.identify_city_by_inn(inns)
+        tag_id = 0
+
         www = 1 if "www." in real_domain else 0
         ip = socket.gethostbyname(response.host)
-        numbers = await self.validator.find_phone_numbers(bs4) # ["number1", "number2"...]
-        emails = await self.validator.find_emails(bs4) # Возврат: {"mobile_numbers": [], "emails:": []}
-        inns = await self.validator.find_inn(bs4) # Возврат: ["ИНН1", "ИНН2", ...]
-        # tag_id = await self.validator.identify_category(bs4, title, description, real_domain) # Возврат: id из таблицы tags
-        tag_id = 0
-        # TODO: Возможно изменить тип поля city на TEXT
-        cities_via_number = await self.validator.identify_city_by_number(numbers) # Возврат: ["Город1", "Город2", ...]
-        cities_via_inn = await self.validator.identify_city_by_inn(inns) # Возврат: ["Москва", "Калининградская область", "Архангельская область"...]
-        # print(f"{id} - Времени прошло - {time.time() - s}")
 
         inn = ",".join(inns)
         # Приоритет определения города
@@ -113,7 +114,6 @@ class MixedParser:
         else:
             city = ""
 
-
         # Информация в таблицу domains
         self.db.make_db_request(f"""
             INSERT INTO {self.statuses_table_name} (id, domain, zone, real_domain, status) 
@@ -121,14 +121,12 @@ class MixedParser:
             ON DUPLICATE KEY UPDATE real_domain='{real_domain}', status=200
         """)
 
-
         # Информация в таблицу domain_info
         self.db.make_db_request(f"""
-            INSERT INTO {self.domain_info_table_name} (domain_id, title, description, city, inn, cms, is_ssl, is_www, ip, tag_id) 
-            VALUE ({id}, '{title}', '{description}', '{city}', '{inn}', '{cms}', '{ssl}', '{www}', '{ip}', {tag_id})
-            ON DUPLICATE KEY UPDATE title='{title}', description='{description}', city='{city}', inn='{inn}', cms='{cms}', is_ssl='{ssl}', is_www='{www}', ip='{ip}', tag_id={tag_id}
+            INSERT INTO {self.domain_info_table_name} (domain_id, title, description, keywords, city, inn, cms, is_www, is_ssl, is_https_redirect, ip, tag_id) 
+            VALUE ({id}, '{title}', '{description}', '{keywords}', '{city}', '{inn}', '{cms}', '{www}', '{is_ssl}', '{is_https_redirect}', '{ip}', {tag_id})
+            ON DUPLICATE KEY UPDATE title='{title}', description='{description}', keywords='{keywords}', city='{city}', inn='{inn}', cms='{cms}', is_www='{www}', is_ssl='{is_ssl}', is_https_redirect='{is_https_redirect}',  ip='{ip}', tag_id={tag_id}
         """)
-
 
         # Информация в таблицу domain_phones
         for number in numbers:
@@ -147,28 +145,66 @@ class MixedParser:
                 ON DUPLICATE KEY UPDATE email='{email}'
             """)
 
+
     async def __make_domain_request(self, domain_base_info):
-        session_timeout = aiohttp.ClientTimeout(total=None, sock_connect=self.timeout, sock_read=self.timeout)
-        connector = aiohttp.TCPConnector(ssl=False)
-        session = aiohttp.ClientSession(connector=connector, timeout=session_timeout, trust_env=True)
         id = domain_base_info["id"]
         domain = domain_base_info["domain"]
-        url = "http://" + domain
         zone = domain_base_info["zone"]
-        try:
-            async with session.get(url, headers=self.__get_headers()) as response:
-                if response.status == 200:
-                    html = await response.text()
-                    await self.__save_site_info(id, domain, zone, response, html)
-                    if id % self.every_printable == 0: print(f"{id} - {response.host} - {response.status}")
+        response = 0
 
-                elif response.status:
+        session_timeout = aiohttp.ClientTimeout(total=None, sock_connect=self.timeout, sock_read=self.timeout)
+
+        https_connector = aiohttp.TCPConnector(verify_ssl=True)
+        https_session = aiohttp.ClientSession(connector=https_connector, timeout=session_timeout)
+        https_url = "https://" + domain
+
+        http_connector = aiohttp.TCPConnector(verify_ssl=False)
+        http_session = aiohttp.ClientSession(connector=http_connector, timeout=session_timeout, trust_env=True)
+        http_url = "http://" + domain
+
+
+        try:
+            try:
+                response = await https_session.get(https_url, headers=self.__get_headers())
+                #! Это говно выкидывает OSerror сокетов
+                # http_response = await http_session.get(http_url, headers=self.__get_headers())
+                is_https_redirect = 0 #if "https://" in http_response.real_url.human_repr() else 0
+                is_ssl = 1
+
+            except (SSLCertVerificationError, ssl.SSLCertVerificationError, aiohttp.client_exceptions.ClientConnectorCertificateError):
+                response = await http_session.get(http_url, headers=self.__get_headers())
+                is_https_redirect = 0
+                is_ssl = 0
+
+            finally:
+                if not response: return
+                try:
+                    if response.status == 200:
+                        html = await response.text()
+                        await self.__save_site_info(id, domain, zone, response, is_ssl, is_https_redirect, html)
+                        
+                        if id % self.every_printable == 0: print(f"{id} - {response.real_url.human_repr()} - {response.status}")
+
+                    elif response.status:
+                        self.db.make_db_request(f"""
+                            UPDATE {self.statuses_table_name} 
+                            SET status={response.status}
+                            WHERE id = {id}    
+                        """)
+                        if id % self.every_printable == 0: print(f"{id} - {response.status}")
+                
+                # status = 888
+                except (UnicodeDecodeError, UnicodeEncodeError,) as error:
                     self.db.make_db_request(f"""
-                        UPDATE {self.statuses_table_name} 
-                        SET status={response.status}
-                        WHERE id = {id}    
-                    """)
-                    if id % self.every_printable == 0: print(f"{id} - {response.status}")
+                            UPDATE {self.statuses_table_name}
+                            SET status = 888
+                            WHERE id = {id}
+                        """)
+                        
+                except (pymysql.err.ProgrammingError, pymysql.err.DataError, ValueError) as error:
+                    logging.error(error)
+
+                
 
         # status = 404
         except (
@@ -177,63 +213,48 @@ class MixedParser:
             ConnectionResetError,
         ) as error:
             self.db.make_db_request(f"""
-                UPDATE {self.statuses_table_name}
-                SET status = 404
-                WHERE id = {id}
-            """)
-        
+                    UPDATE {self.statuses_table_name}
+                    SET status = 404
+                    WHERE id = {id}
+                """)
+
         # status = 400
         except (
             aiohttp.client_exceptions.ClientPayloadError,
             aiohttp.client_exceptions.ClientResponseError
-            ) as error:
+        ) as error:
             self.db.make_db_request(f"""
-                UPDATE {self.statuses_table_name}
-                SET status = 400
-                WHERE id = {id}
-            """) 
+                    UPDATE {self.statuses_table_name}
+                    SET status = 400
+                    WHERE id = {id}
+                """)
 
         # status TimeoutError = 408 status
         except aiohttp.client_exceptions.ServerTimeoutError as error:
             self.db.make_db_request(f"""
-                UPDATE {self.statuses_table_name}
-                SET status = 408
-                WHERE id = {id}
-            """)        
-            # print(f"{id} - {url} - {error}")       
+                    UPDATE {self.statuses_table_name}
+                    SET status = 408
+                    WHERE id = {id}
+                """)
 
-        # status = 888
-        except (
-            UnicodeDecodeError,
-            UnicodeEncodeError,
-         ) as error:
-            self.db.make_db_request(f"""
-                UPDATE {self.statuses_table_name}
-                SET status = 888
-                WHERE id = {id}
-            """)
+           
+        except OSError as error:
+            # ! Она даже не печатается, потому что, скорее всего, вылазит не в файлах парсера
+            # ! На linux сервере не вылазят
+            # WinError 10038 - хз
+            # WinError 10053 - может быть рабочий сайт
+            # WinError 10054 - хз
+            pass
 
         
-        # ! Она даже не печатается, потому что, скорее всего, вылазит не в файлах парсера 
-        # ! На linux сервере не вылазят
-        # WinError 10038 - хз
-        # WinError 10053 - может быть рабочий сайт
-        # WinError 10054 - хз
-        except OSError as error:
-            pass
-
-        # TODO: Придумать как обойти это
-        # Сайт либо заблокироан, либо без ssl сертификата
         except aiohttp.client_exceptions.ServerDisconnectedError as error:
+            # TODO: Придумать как обойти это
+            # Сайт либо заблокироан, либо без ssl сертификата
             pass
-
-        except (pymysql.err.ProgrammingError, pymysql.err.DataError, ValueError) as error:
-            logging.error(error)
-
-
+        
         finally:
-            await session.close()
-
+            await http_session.close()
+            await https_session.close()
 
     async def __parse_all_domains(self):
         requests = []
@@ -250,17 +271,19 @@ class MixedParser:
             requests.append(self.__make_domain_request(domain_base_info))
         print(f"Парсинг с {self.offset} по {self.offset+self.limit} начался")
         # TODO: Разбить на 4 части и запустить 4 процесса
-        await asyncio.gather(*requests)
+        await asyncio.gather(*requests, )
         requests.clear()
 
-
-        print(f"-------- Обработка {self.domains_count} запросов заняла  {time.time() - start_time} секунд --------")
-
+        print(
+            f"-------- Обработка {self.domains_count} запросов заняла  {time.time() - start_time} секунд --------")
 
     def __download_ru_domains_file_if_not_exists(self):
-        if (exists(self.file_path)): return
-        if not (exists(self.archives_path)): os.mkdir(self.archives_path)
-        if not (exists(self.extracted_files_path)): os.mkdir(self.extracted_files_path)
+        if (exists(self.file_path)):
+            return
+        if not (exists(self.archives_path)):
+            os.mkdir(self.archives_path)
+        if not (exists(self.extracted_files_path)):
+            os.mkdir(self.extracted_files_path)
         start_time = time.time()
         print("Началась загрузка архива с доменами...")
         urlretrieve(self.download_link, self.ru_archive_path)
@@ -272,7 +295,6 @@ class MixedParser:
         print("Файл распакован")
         os.remove(self.ru_archive_path)
         print("Архив удалён")
-
 
     def __get_rows_from_txt(self):
         domains = []
@@ -289,7 +311,6 @@ class MixedParser:
                 counter += 1
         print(f"Файл прочитан за {time.time() - start_time}")
         return domains
-
 
     def __get_headers(self):
         user_agents = {
@@ -322,18 +343,23 @@ def main():
     arg_parser.add_argument("--portion")
     args = arg_parser.parse_args()
 
-    domains_count = DbConnector().make_single_db_request("SELECT count(*) FROM domains")["count(*)"]
-    first_id = DbConnector().make_single_db_request("SELECT id FROM domains ORDER BY id ASC LIMIT 1")["id"]
+    domains_count = DbConnector().make_single_db_request(
+        "SELECT count(*) FROM domains")["count(*)"]
+    first_id = DbConnector().make_single_db_request(
+        "SELECT id FROM domains ORDER BY id ASC LIMIT 1")["id"]
 
     # * Начальный индекс для парсинга
     offset = 0
-    if args.offset: offset = int(args.offset)
+    if args.offset:
+        offset = int(args.offset)
     # * Количество процессов парсера
     cores_number = 4
-    if args.cores: cores_number = int(args.cores)
+    if args.cores:
+        cores_number = int(args.cores)
     # * Одновременно обрабатываемая порция
     portion = 10000
-    if args.portion: portion = int(args.portion)
+    if args.portion:
+        portion = int(args.portion)
 
     start_index = first_id + offset
 
@@ -343,12 +369,13 @@ def main():
     step = portion // cores_number + portion % cores_number
 
     # Для небольшого количества записей
-    if step > domains_count: 
+    if step > domains_count:
         step = domains_count
         cores_number = 1
 
     for offset in range(start_index, domains_count + start_index, step):
-        domains = DbConnector().make_db_request(f"SELECT * FROM domains WHERE id >= {offset} LIMIT {step}")
+        domains = DbConnector().make_db_request(
+            f"SELECT * FROM domains WHERE id >= {offset} LIMIT {step}")
         process = Process(target=create_parser, args=(step, offset, domains))
         process.start()
         processes.append(process)
@@ -357,7 +384,8 @@ def main():
                 process.join()
             processes.clear()
 
-    print(f"Парсинг c {start_index} по {start_index + portion} закончился за {time.time() - start_time}")
+    print(
+        f"Парсинг c {start_index} по {start_index + portion} закончился за {time.time() - start_time}")
 
 
 def create_parser(portion, offset, domains):
