@@ -243,8 +243,9 @@ class MixedParser:
                     SET status = 888
                     WHERE id = {id}
                 """)
-
-        except ssl.CertificateError:
+        
+        #! Для работы на сервере
+        except (ssl.CertificateError, ValueError):
             pass
   
         except (pymysql.err.ProgrammingError, pymysql.err.DataError, ValueError) as error:

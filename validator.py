@@ -39,16 +39,19 @@ class Validator():
 
     def get_compiled_banwords(self):
         banwords = {
+            # без \b...\b
             "title": [
                 "timeweb", "срок регистрации", "404", "403", "welcome to nginx", "сайт в разработке", "доменное имя продается", "временно недоступен", "в разработке", "сайт заблокирован", "document", "как вы здесь оказались", "under construction", "домен продается", "домен продаётся", "just a moment", "домен не прилинкован", "for sale", "домен уже", "площадке интернет", "access denied", "витрина домена", "to centos", "доменное имя", "сайт создан", "надёжно припаркован",  "купить домен",
                 "недоступен", "доступ ограничен", "вы владелец сайта", "отключен", "это тестовый", "продаётся домен", "домен не добавлен", "domain name", "не опубликован", "на технической площадке", "blank page", "припаркован", "website", "данный домен", "loading", "captcha", "домен зарегистрирован", "закрыто", "не работает", "доступ к сайту", "default page", "没有找到站点", "сайт успешно", "ещё один сайт", "который можно купить", "по умолчанию", "на реконстркции", "заглушка для сайта", "index of", "not found",
-                "хостинг vps", "файл отсутствует", "report", "без названия", "coming Soon", "бдсм", 
-                "порно", "porn", "sex", "секс", "проститутки", "шлюхи", "хентай", 
-                "1xbet", 
+                "хостинг vps", "файл отсутствует", "report", "без названия", "coming Soon",  "error", "домен не настроен", "сайт не запущен", "are not published"
+                "порно", "porn", "sex", "секс", "проститутки", "шлюхи", "хентай", "бдсм",
+                "1x", "1х", "казино", "casino", "brazzers", "займ", "букмекер", 
             ],
+            # с \b...\b
             "description" : [
                 "описание сайта", "магазин доменных имен", "ставки", "ставка",  "default index page", "ещё один сайт на wordpress",
             ],
+            # без \b...\b
             "content" : [
                 "reg.ru", "we'll be back soon!", "пусть домен работает", "добро пожаловать в wordpress", "403 forbidden", "эта страница генерируется автоматически",
                 "цифирные домены от", "если этот сайт принадлежит вам", "этот домен продается", "account has been suspended", "сайт находится в стадии разработки",
@@ -60,6 +63,7 @@ class Validator():
             "description": [re.compile(fr"\b{word}\b") for word in banwords["description"]],
             "content": [re.compile(fr"{word}") for word in banwords["content"]],
         }
+
         return compiled_banwords
 
 
@@ -112,13 +116,15 @@ class Validator():
 
     async def identify_city_by_number(self, numbers):
         cities = []
-        for number in numbers:
-            valid_number = phonenumbers.parse(number, "RU")
-            location = geocoder.description_for_number(valid_number, "ru")
-            # operator = carrier.name_for_number(valid_number, "en")
-            if location: cities.append(location)
-        return list(set(cities))
-
+        try:
+            for number in numbers:
+                valid_number = phonenumbers.parse(number, "RU")
+                location = geocoder.description_for_number(valid_number, "ru")
+                # operator = carrier.name_for_number(valid_number, "en")
+                if location: cities.append(location)
+            return list(set(cities))
+        except phonenumbers.phonenumberutil.NumberParseException:
+            return cities
 
     # TODO: Бесплатное API для проверки организации по ИНН
     # https://htmlweb.ru/service/organization_api.php#api
