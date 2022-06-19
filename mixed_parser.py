@@ -100,26 +100,28 @@ class MixedParser:
                 ON DUPLICATE KEY UPDATE real_domain='{real_domain}', status=000
             """)
             return
-        keywords = await self.validator.find_keywords(bs4)
-        cms = await self.validator.identify_cms(html) 
-        numbers = await self.validator.find_phone_numbers(bs4)
-        emails = await self.validator.find_emails(bs4)
-        inns = await self.validator.find_inn(bs4)
-        cities_via_number = await self.validator.identify_city_by_number(numbers)
-        cities_via_inn = await self.validator.identify_city_by_inn(inns)
+        
+        keywords = self.validator.find_keywords(bs4)
+        cms = self.validator.identify_cms(html) 
+        numbers = self.validator.find_phone_numbers(bs4)
+        emails = self.validator.find_emails(bs4)
+        inns = self.validator.find_inn(bs4)
         tag_id = 0
+
+        data = await asyncio.gather(keywords, cms, numbers, emails, inns)
+        keywords = data[0]
+        cms = data[1]
+        numbers = data[2]
+        emails = data[3]
+        inns = data[4]
+        cities = await self.validator.identify_city_by_inn(inns) if inns else await self.validator.identify_city_by_number(numbers)
 
         www = 1 if "www." in real_domain else 0
         ip = socket.gethostbyname(response.host)
 
-        inn = ",".join(inns)
-        # Приоритет определения города
-        if len(cities_via_inn) > 0:
-            city = ",".join(cities_via_inn)
-        elif len(cities_via_number) > 0:
-            city = ",".join(cities_via_number)
-        else:
-            city = ""
+        inn = ",".join(inns) if inns else ""
+        cities = ",".join(cities) if cities else ""
+        
 
         # Информация в таблицу domains
         self.db.make_db_request(f"""
@@ -131,8 +133,8 @@ class MixedParser:
         # Информация в таблицу domain_info
         self.db.make_db_request(f"""
             INSERT INTO {self.domain_info_table_name} (domain_id, title, description, keywords, city, inn, cms, is_www, is_ssl, is_https_redirect, ip, tag_id) 
-            VALUE ({id}, '{title}', '{description}', '{keywords}', '{city}', '{inn}', '{cms}', '{www}', '{is_ssl}', '{is_https_redirect}', '{ip}', {tag_id})
-            ON DUPLICATE KEY UPDATE title='{title}', description='{description}', keywords='{keywords}', city='{city}', inn='{inn}', cms='{cms}', is_www='{www}', is_ssl='{is_ssl}', is_https_redirect='{is_https_redirect}',  ip='{ip}', tag_id={tag_id}
+            VALUE ({id}, '{title}', '{description}', '{keywords}', '{cities}', '{inn}', '{cms}', '{www}', '{is_ssl}', '{is_https_redirect}', '{ip}', {tag_id})
+            ON DUPLICATE KEY UPDATE title='{title}', description='{description}', keywords='{keywords}', city='{cities}', inn='{inn}', cms='{cms}', is_www='{www}', is_ssl='{is_ssl}', is_https_redirect='{is_https_redirect}',  ip='{ip}', tag_id={tag_id}
         """)
 
         # Информация в таблицу domain_phones
@@ -260,16 +262,15 @@ class MixedParser:
                 "start_time": start_time
             }
             requests.append(self.__make_domain_request(domain_base_info))
-        print(f"Парсинг с {self.offset} по {self.offset+self.limit} начался")
+        # print(f"Парсинг с {self.offset} по {self.offset+self.limit} начался")
         # TODO: Разбить на 4 части и запустить 4 процесса
         await asyncio.gather(*requests)
         await self.http_session.close()
         await self.https_session.close()
         requests.clear()
+        # print(f"-------- Обработка {self.domains_count} запросов заняла  {time.time() - start_time} секунд --------")
 
 
-        print(
-            f"-------- Обработка {self.domains_count} запросов заняла  {time.time() - start_time} секунд --------")
 
     def __download_ru_domains_file_if_not_exists(self):
         if (exists(self.file_path)):
@@ -326,6 +327,12 @@ def load_dot_env():
         load_dotenv(dotenv_path)
 
 
+def create_parser(portion, offset, domains):
+    # logging.basicConfig(filename="logs.log", encoding="utf-8")
+    parser = MixedParser(portion, offset, domains)
+    parser.run()
+
+
 def main():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     load_dot_env()
@@ -357,7 +364,7 @@ def main():
 
     start_index = first_id + offset
 
-    start_time = time.time()
+    global_start_time = time.time()
     processes = []
 
     step = portion // cores_number + portion % cores_number
@@ -368,8 +375,8 @@ def main():
         cores_number = 1
 
     for offset in range(start_index, domains_count + start_index, step):
-        domains = DbConnector().make_db_request(
-            f"SELECT * FROM domains WHERE id >= {offset} LIMIT {step}")
+        portion_start_time = time.time()
+        domains = DbConnector().make_db_request(f"SELECT * FROM domains WHERE id >= {offset} LIMIT {step}")
         process = Process(target=create_parser, args=(step, offset, domains))
         process.start()
         processes.append(process)
@@ -377,15 +384,9 @@ def main():
             for process in processes:
                 process.join()
             processes.clear()
+            print(f"С {offset} по {offset + step} за {time.time() - portion_start_time} - Общее время парсинга: {time.time() - global_start_time}")
 
-    print(
-        f"Парсинг c {start_index} по {start_index + portion} закончился за {time.time() - start_time}")
-
-
-def create_parser(portion, offset, domains):
-    # logging.basicConfig(filename="logs.log", encoding="utf-8")
-    parser = MixedParser(portion, offset, domains)
-    parser.run()
+    print(f"Парсинг c {start_index} по {domains_count} закончился за {time.time() - global_start_time}")
 
 
 if __name__ == "__main__":
