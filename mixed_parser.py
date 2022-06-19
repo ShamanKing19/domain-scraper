@@ -48,6 +48,13 @@ class MixedParser:
         self.limit = limit
         self.offset = offset
 
+        session_timeout = aiohttp.ClientTimeout(total=None, sock_connect=self.timeout, sock_read=self.timeout)
+        https_connector = aiohttp.TCPConnector(verify_ssl=True, limit=10000)
+        http_connector = aiohttp.TCPConnector(verify_ssl=False, limit=10000)
+        self.https_session = aiohttp.ClientSession(connector=https_connector, timeout=session_timeout)
+        self.http_session = aiohttp.ClientSession(connector=http_connector, timeout=session_timeout, trust_env=True)
+
+
         # Получение списка доменов и создание таблиц
         # request_time = time.time()
         if self.is_table_exists:
@@ -76,7 +83,7 @@ class MixedParser:
     def run(self):
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self.__parse_all_domains())
-
+        
 
     async def __save_site_info(self, id, domain, zone, response, is_ssl, is_https_redirect, html):
         real_domain = str(response.real_url.human_repr())
@@ -146,65 +153,50 @@ class MixedParser:
             """)
 
 
+    async def __http_request(self, domain):
+        http_url = "http://" + domain
+        response = await self.http_session.get(http_url, headers=self.__get_headers())
+        return response
+
+
+    async def __https_request(self, domain):
+        try:
+            https_url = "https://" + domain
+            response = await self.https_session.get(https_url, headers=self.__get_headers())
+            return response
+        
+        except (SSLCertVerificationError, ssl.SSLCertVerificationError, aiohttp.client_exceptions.ClientConnectorCertificateError):
+            return False
+
+  
     async def __make_domain_request(self, domain_base_info):
         id = domain_base_info["id"]
         domain = domain_base_info["domain"]
         zone = domain_base_info["zone"]
-        response = 0
-
-        session_timeout = aiohttp.ClientTimeout(total=None, sock_connect=self.timeout, sock_read=self.timeout)
-
-        https_connector = aiohttp.TCPConnector(verify_ssl=True)
-        https_session = aiohttp.ClientSession(connector=https_connector, timeout=session_timeout)
-        https_url = "https://" + domain
-
-        http_connector = aiohttp.TCPConnector(verify_ssl=False)
-        http_session = aiohttp.ClientSession(connector=http_connector, timeout=session_timeout, trust_env=True)
-        http_url = "http://" + domain
-
 
         try:
-            try:
-                response = await https_session.get(https_url, headers=self.__get_headers())
-                #! Это говно выкидывает OSerror сокетов
-                # http_response = await http_session.get(http_url, headers=self.__get_headers())
-                is_https_redirect = 0 #if "https://" in http_response.real_url.human_repr() else 0
-                is_ssl = 1
+            results = await asyncio.gather(self.__http_request(domain_base_info["domain"]), self.__https_request(domain_base_info["domain"]), return_exceptions=False)
+            http_response = results[0]
+            https_response = results[1]
 
-            except (SSLCertVerificationError, ssl.SSLCertVerificationError, aiohttp.client_exceptions.ClientConnectorCertificateError):
-                response = await http_session.get(http_url, headers=self.__get_headers())
-                is_https_redirect = 0
-                is_ssl = 0
+            # https redirect check
+            if not http_response: return
+            is_https_redirect = 1 if "https://" in http_response.real_url.human_repr() else 0
+            is_ssl = is_https_redirect
 
-            finally:
-                if not response: return
-                try:
-                    if response.status == 200:
-                        html = await response.text()
-                        await self.__save_site_info(id, domain, zone, response, is_ssl, is_https_redirect, html)
-                        
-                        if id % self.every_printable == 0: print(f"{id} - {response.real_url.human_repr()} - {response.status}")
+            # no https redirect check but with ssl
+            if https_response: is_ssl = 1 if "https://" in https_response.real_url.human_repr() else 0
 
-                    elif response.status:
-                        self.db.make_db_request(f"""
-                            UPDATE {self.statuses_table_name} 
-                            SET status={response.status}
-                            WHERE id = {id}    
-                        """)
-                        if id % self.every_printable == 0: print(f"{id} - {response.status}")
+            if http_response.status == 200:
+                html = await http_response.text()
+                await self.__save_site_info(id, domain, zone, http_response, is_ssl, is_https_redirect, html)
                 
-                # status = 888
-                except (UnicodeDecodeError, UnicodeEncodeError,) as error:
-                    self.db.make_db_request(f"""
-                            UPDATE {self.statuses_table_name}
-                            SET status = 888
-                            WHERE id = {id}
-                        """)
-                        
-                except (pymysql.err.ProgrammingError, pymysql.err.DataError, ValueError) as error:
-                    logging.error(error)
-
-                
+            elif http_response.status:
+                self.db.make_db_request(f"""
+                    UPDATE {self.statuses_table_name} 
+                    SET status={http_response.status}
+                    WHERE id = {id}    
+                """)
 
         # status = 404
         except (
@@ -237,25 +229,24 @@ class MixedParser:
                     WHERE id = {id}
                 """)
 
-           
-        except OSError as error:
-            # ! Она даже не печатается, потому что, скорее всего, вылазит не в файлах парсера
-            # ! На linux сервере не вылазят
-            # WinError 10038 - хз
-            # WinError 10053 - может быть рабочий сайт
-            # WinError 10054 - хз
-            pass
-
-        
         except aiohttp.client_exceptions.ServerDisconnectedError as error:
             # TODO: Придумать как обойти это
             # Сайт либо заблокироан, либо без ssl сертификата
             pass
         
-        finally:
-            await http_session.close()
-            await https_session.close()
+        # status = 888
+        except (UnicodeDecodeError, UnicodeEncodeError,) as error:
+            self.db.make_db_request(f"""
+                    UPDATE {self.statuses_table_name}
+                    SET status = 888
+                    WHERE id = {id}
+                """)
+                
+        except (pymysql.err.ProgrammingError, pymysql.err.DataError, ValueError) as error:
+            # logging.error(error)
+            print(error)
 
+        
     async def __parse_all_domains(self):
         requests = []
         start_time = time.time()
@@ -271,8 +262,11 @@ class MixedParser:
             requests.append(self.__make_domain_request(domain_base_info))
         print(f"Парсинг с {self.offset} по {self.offset+self.limit} начался")
         # TODO: Разбить на 4 части и запустить 4 процесса
-        await asyncio.gather(*requests, )
+        await asyncio.gather(*requests)
+        await self.http_session.close()
+        await self.https_session.close()
         requests.clear()
+
 
         print(
             f"-------- Обработка {self.domains_count} запросов заняла  {time.time() - start_time} секунд --------")
