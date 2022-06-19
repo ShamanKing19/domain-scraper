@@ -1,9 +1,10 @@
-import logging
+import warnings
+warnings.filterwarnings("ignore")
+
 import os
 import ssl
 import time
 import zipfile
-from ssl import SSLCertVerificationError
 import socket
 import aiohttp
 import asyncio
@@ -13,7 +14,6 @@ from multiprocessing import Process
 from urllib.request import urlretrieve
 from genericpath import exists
 import argparse
-import warnings
 
 import pymysql
 
@@ -167,7 +167,7 @@ class MixedParser:
             response = await self.https_session.get(https_url, headers=self.__get_headers())
             return response
         
-        except (SSLCertVerificationError, ssl.SSLCertVerificationError, aiohttp.client_exceptions.ClientConnectorCertificateError):
+        except (ssl.CertificateError, aiohttp.client_exceptions.ClientConnectorCertificateError):
             return False
 
   
@@ -243,7 +243,10 @@ class MixedParser:
                     SET status = 888
                     WHERE id = {id}
                 """)
-                
+
+        except ssl.CertificateError:
+            pass
+  
         except (pymysql.err.ProgrammingError, pymysql.err.DataError, ValueError) as error:
             # logging.error(error)
             print(error)
@@ -334,7 +337,7 @@ def create_parser(portion, offset, domains):
 
 
 def main():
-    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    ssl.match_hostname = lambda cert, hostname: True
     load_dot_env()
 
     # Настройка аргументов при запуске через консоль
@@ -384,7 +387,7 @@ def main():
             for process in processes:
                 process.join()
             processes.clear()
-            print(f"С {offset} по {offset + step} за {time.time() - portion_start_time} - Общее время парсинга: {time.time() - global_start_time}")
+            print(f"С {offset-(step*3)} по {offset+step} за {time.time() - portion_start_time} - Общее время парсинга: {time.time() - global_start_time}")
 
     print(f"Парсинг c {start_index} по {domains_count} закончился за {time.time() - global_start_time}")
 
