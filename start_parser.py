@@ -15,9 +15,9 @@ def load_dot_env():
         load_dotenv(dotenv_path)
 
 
-def create_parser(portion, offset, domains):
+def run_parser(portion, offset, domains):
     # logging.basicConfig(filename="logs.log", encoding="utf-8")
-    parser = Parser(portion, offset, domains)
+    parser = Parser(domains)
     parser.run()
 
 
@@ -64,7 +64,7 @@ def main():
     for offset in range(start_index, domains_count + start_index, step):
         portion_start_time = time.time()
         domains = DbConnector().make_db_request(f"SELECT * FROM domains WHERE id >= {offset} LIMIT {step}")
-        process = Process(target=create_parser, args=(step, offset, domains))
+        process = Process(target=run_parser, args=(step, offset, domains))
         process.start()
         processes.append(process)
         if len(processes) == cores_number:

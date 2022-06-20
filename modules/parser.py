@@ -11,10 +11,8 @@ import aiohttp
 import asyncio
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from multiprocessing import Process
 from urllib.request import urlretrieve
 from genericpath import exists
-import argparse
 
 import pymysql
 
@@ -24,7 +22,7 @@ from modules.validator import Validator
 
 
 class Parser:
-    def __init__(self, limit, offset, domains):
+    def __init__(self, domains):
         # Данные для скачивания файла
         self.download_link = "https://statonline.ru/domainlist/file?tld="
         self.archives_path = "archives"
@@ -46,8 +44,6 @@ class Parser:
         # Можно разбить на connection и readtimeout
         self.timeout = 5
         self.every_printable = 10000
-        self.limit = limit
-        self.offset = offset
 
         session_timeout = aiohttp.ClientTimeout(total=None, sock_connect=self.timeout, sock_read=self.timeout)
         https_connector = aiohttp.TCPConnector(verify_ssl=True, limit=10000)
@@ -59,7 +55,6 @@ class Parser:
         # Получение списка доменов и создание таблиц
         # request_time = time.time()
         if self.is_table_exists:
-            self.domains_count = self.offset + self.limit
             self.domains = domains
         # TODO: Сделать чтобы в случае чтения с файла он тоже брал инфу порциями
         else:
@@ -267,7 +262,7 @@ class Parser:
                 "start_time": start_time
             }
             requests.append(self.__make_domain_request(domain_base_info))
-        # print(f"Парсинг с {self.offset} по {self.offset+self.limit} начался")
+            
         # TODO: Разбить на 4 части и запустить 4 процесса
         await asyncio.gather(*requests)
         await self.http_session.close()
