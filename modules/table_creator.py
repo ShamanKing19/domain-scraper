@@ -2,7 +2,7 @@ import os
 import time
 import pymysql
 
-from db_connector import DbConnector
+from modules.db_connector import DbConnector
 
 
 class TableCreator:
