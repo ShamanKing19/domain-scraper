@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS `domain_info` (
     `tag_id` INT NULL,
     `status` VARCHAR(30) DEFAULT 'Отсутствует',
     `comment` TEXT,
+    `bitrix_id` BIGINT UNSIGNED,
     FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`),
     FOREIGN KEY (`tag_id`) REFERENCES `tags` (`id`)
 );

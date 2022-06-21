@@ -1,3 +1,4 @@
+import http
 import warnings
 warnings.filterwarnings("ignore")
 import ssl
@@ -113,8 +114,11 @@ class Parser:
         cities = await self.validator.identify_city_by_inn(inns) if inns else await self.validator.identify_city_by_number(numbers)
 
         www = 1 if "www." in real_domain else 0
-        ip = socket.gethostbyname(response.host)
-
+        try:
+            ip = socket.gethostbyname(response.host)
+        except:
+            ip = ""
+        
         inn = ",".join(inns) if inns else ""
         cities = ",".join(cities) if cities else ""
         
@@ -241,7 +245,7 @@ class Parser:
                 """)
         
         #! Для работы на сервере
-        except (ssl.CertificateError, ValueError):
+        except (ssl.CertificateError, ValueError, http.cookies.CookieError):
             pass
   
         except (pymysql.err.ProgrammingError, pymysql.err.DataError, ValueError) as error:

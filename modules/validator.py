@@ -43,13 +43,17 @@ class Validator():
             "title": [
                 "timeweb", "срок регистрации", "404", "403", "welcome to nginx", "сайт в разработке", "доменное имя продается", "временно недоступен", "в разработке", "сайт заблокирован", "document", "как вы здесь оказались", "under construction", "домен продается", "домен продаётся", "just a moment", "домен не прилинкован", "for sale", "домен уже", "площадке интернет", "access denied", "витрина домена", "to centos", "доменное имя", "сайт создан", "надёжно припаркован",  "купить домен",
                 "недоступен", "доступ ограничен", "вы владелец сайта", "отключен", "это тестовый", "продаётся домен", "домен не добавлен", "domain name", "не опубликован", "на технической площадке", "blank page", "припаркован", "website", "данный домен", "loading", "captcha", "домен зарегистрирован", "закрыто", "не работает", "доступ к сайту", "default page", "没有找到站点", "сайт успешно", "ещё один сайт", "который можно купить", "по умолчанию", "на реконстркции", "заглушка для сайта", "index of", "not found",
-                "хостинг vps", "файл отсутствует", "report", "без названия", "coming Soon",  "error", "домен не настроен", "сайт не запущен", "are not published",
+                "хостинг vps", "файл отсутствует", "report", "без названия", "coming soon",  "error", "домен не настроен", "сайт не запущен", "are not published",
                 "порно", "porn", "sex", "секс", "проститутки", "шлюхи", "хентай", "бдсм", "гей", "геи", "увеличить член", 
-                "1x", "1х", "казино", "casino", "brazzers", "займ", "букмекер", 
+                "1x", "1х", "казино", "casino", "brazzers", "займ", "букмекер", "действие аккаунта приостановлено", 
+                "welcome to adminvps!", "упс! домен не видит хостинг", "запрошенный сайт отсутствует на нашем хостинге", "ukit — сайт не оплачен", "coming soon",
+                "pages are not published", "fastpanel", "lptrend | конструктор лендингов", "страница входа", "здоровая росссия", 
+                "РќРµ РѕРїСѓР±Р»РёРєРѕРІР°РЅ", "SpaceWeb", "Success!", "To Bet, игровая платформа", "Alle Bikes", "Настройте домен правильно",
             ],
             # с \b...\b
             "description" : [
                 "описание сайта", "магазин доменных имен", "ставки", "ставка",  "default index page", "ещё один сайт на wordpress",
+                "закрытый форум", 
             ],
             # без \b...\b
             "content" : [
@@ -59,9 +63,9 @@ class Validator():
         }
 
         compiled_banwords = {
-            "title": [re.compile(fr"{word}") for word in banwords["title"]], 
-            "description": [re.compile(fr"\b{word}\b") for word in banwords["description"]],
-            "content": [re.compile(fr"{word}") for word in banwords["content"]],
+            "title": [re.compile(fr"{word.lower()}") for word in banwords["title"]], 
+            "description": [re.compile(fr"\b{word.lower()}\b") for word in banwords["description"]],
+            "content": [re.compile(fr"{word.lower()}") for word in banwords["content"]],
         }
 
         return compiled_banwords
