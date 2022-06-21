@@ -135,4 +135,7 @@ composer.phar
 archives
 __pycache__
 
-.vscode/settings.json
+.vscode
+Дубликаты заголовков.txt
+.gitignore
+Проверить.txt

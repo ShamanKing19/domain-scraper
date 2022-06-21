@@ -2,8 +2,10 @@ import os
 import time
 import pymysql
 
-from modules.db_connector import DbConnector
-
+try:
+    from modules.db_connector import DbConnector
+except:
+    from db_connector import DbConnector
 
 class TableCreator:
     def __init__(self):

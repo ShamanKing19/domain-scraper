@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS `domain_info` (
     `city` TEXT,
     `inn` VARCHAR(255),
     `cms` VARCHAR(100),
+    `hosting` VARCHAR(100),
     `is_ssl` BOOLEAN,
     `is_www` BOOLEAN,
     `is_https_redirect` BOOLEAN,

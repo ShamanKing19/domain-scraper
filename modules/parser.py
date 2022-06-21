@@ -10,6 +10,7 @@ import zipfile
 import socket
 import aiohttp
 import asyncio
+import whois
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from urllib.request import urlretrieve
@@ -118,7 +119,11 @@ class Parser:
             ip = socket.gethostbyname(response.host)
         except:
             ip = ""
-        
+        try:
+            hosting = whois.whois(real_domain)["registrar"]
+        except:
+            hosting = ""
+
         inn = ",".join(inns) if inns else ""
         cities = ",".join(cities) if cities else ""
         
@@ -132,9 +137,9 @@ class Parser:
 
         # Информация в таблицу domain_info
         self.db.make_db_request(f"""
-            INSERT INTO {self.domain_info_table_name} (domain_id, title, description, keywords, city, inn, cms, is_www, is_ssl, is_https_redirect, ip, tag_id) 
-            VALUE ({id}, '{title}', '{description}', '{keywords}', '{cities}', '{inn}', '{cms}', '{www}', '{is_ssl}', '{is_https_redirect}', '{ip}', {tag_id})
-            ON DUPLICATE KEY UPDATE title='{title}', description='{description}', keywords='{keywords}', city='{cities}', inn='{inn}', cms='{cms}', is_www='{www}', is_ssl='{is_ssl}', is_https_redirect='{is_https_redirect}',  ip='{ip}', tag_id={tag_id}
+            INSERT INTO {self.domain_info_table_name} (domain_id, title, description, keywords, city, inn, cms, hosting, is_www, is_ssl, is_https_redirect, ip, tag_id) 
+            VALUE ({id}, '{title}', '{description}', '{keywords}', '{cities}', '{inn}', '{cms}', '{hosting}', '{www}', '{is_ssl}', '{is_https_redirect}', '{ip}', {tag_id})
+            ON DUPLICATE KEY UPDATE title='{title}', description='{description}', keywords='{keywords}', city='{cities}', inn='{inn}', cms='{cms}', hosting='{hosting}', is_www='{www}', is_ssl='{is_ssl}', is_https_redirect='{is_https_redirect}',  ip='{ip}', tag_id={tag_id}
         """)
 
         # Информация в таблицу domain_phones
