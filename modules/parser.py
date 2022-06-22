@@ -90,8 +90,8 @@ class Parser:
         # s = time.time()
         title = await self.validator.find_title(bs4)  
         description = await self.validator.find_description(bs4)
+        # TODO: Переделать под возврат категории инвалидного статуса
         if not await self.validator.is_valid(bs4, title, description, id, real_domain):
-            #! invalid site: status = 000
             self.db.make_db_request(f"""
                 INSERT INTO {self.statuses_table_name} (id, domain, zone, real_domain, status) 
                 VALUE ('{id}', '{domain}', '{zone}', '{real_domain}', {000})
@@ -99,20 +99,15 @@ class Parser:
             """)
             return
         
-        keywords = self.validator.find_keywords(bs4)
-        cms = self.validator.identify_cms(html) 
-        numbers = self.validator.find_phone_numbers(bs4)
-        emails = self.validator.find_emails(bs4)
-        inns = self.validator.find_inn(bs4)
-        tag_id = 0
-
-        data = await asyncio.gather(keywords, cms, numbers, emails, inns)
-        keywords = data[0]
-        cms = data[1]
-        numbers = data[2]
-        emails = data[3]
-        inns = data[4]
+        keywords = await self.validator.find_keywords(bs4)
+        cms = await self.validator.identify_cms(html) 
+        numbers = await self.validator.find_phone_numbers(bs4)
+        emails = await self.validator.find_emails(bs4)
+        inns = await self.validator.find_inn(bs4)
         cities = await self.validator.identify_city_by_inn(inns) if inns else await self.validator.identify_city_by_number(numbers)
+        company_info = await self.validator.get_info_by_inn(inns, self.http_session)
+       
+        tag_id = 0
 
         www = 1 if "www." in real_domain else 0
         try:

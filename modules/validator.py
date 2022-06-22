@@ -1,8 +1,10 @@
+import json
 import os
 from pprint import pprint
 import re
 import time
 import warnings
+import aiohttp
 from dotenv import load_dotenv
 import phonenumbers
 from phonenumbers import geocoder
@@ -22,7 +24,7 @@ class Validator():
         self.compiled_tags_categories = self.get_compiled_tags(copy.deepcopy(categories))
         self.compiled_banwords = self.get_compiled_banwords()
         self.regions = regions
-        
+                
        # TODO: Довести до идеала регулярки
         self.re_numbers_template = re.compile(r"\+?[78]{1}[\s\(-]{0,2}[0-9]{3,4}[\s\)]?[\s-]?[0-9-\s]{0,4}[0-9-\s]{0,5}")
         self.re_sub_number_template = re.compile(r"[^0-9]")
@@ -130,8 +132,24 @@ class Validator():
         except phonenumbers.phonenumberutil.NumberParseException:
             return cities
 
+
+    async def get_info_by_inn(self, inns, session):
+        for inn in inns:
+            url = f"https://egrul.itsoft.ru/{inn}.json"
+            print(url)
+            response = await session.get(url)
+            file = open(f"company_info/{inn}.json", "w", encoding="utf-8")
+            response_text = await response.json()
+            # finances = response.json()["fin"] 
+            # text = json.dumps(response_text, ensure_ascii=False, indent=4) 
+            # file.write(text)
+            # file.close()
+
+
     # TODO: Бесплатное API для проверки организации по ИНН
     # https://htmlweb.ru/service/organization_api.php#api
+    # !Тут ваще всё без ограничений
+    # https://egrul.itsoft.ru/{inn}.json или .xml
     async def find_inn(self, bs4):
         all_inns = list(set(re.findall(self.re_inn_template, bs4.text)))
         correct_inns = []
@@ -246,6 +264,9 @@ class Validator():
 
 
     async def is_valid(self, bs4, title, description, id, url):
+        invalid_status_dict = {
+
+        }
         if not title:
             return False
         

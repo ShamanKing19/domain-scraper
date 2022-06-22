@@ -61,6 +61,11 @@ class TableCreator:
         with open("migrations/region_values_migration.sql", "r", encoding="utf-8") as migration:
             self.db.make_db_request(migration.read()) 
 
+        # company_info TABLE creation
+        with open("migrations/company_info.sql", "r", encoding="utf-8") as migration:
+            self.db.make_db_request(migration.read()) 
+
+
 
 def main():
     table_creator = TableCreator()
