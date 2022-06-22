@@ -40,12 +40,12 @@ class Validator():
         banwords = {
             # без \b...\b
             "title": [
-                "timeweb", "срок регистрации", "404", "403", "welcome to nginx", "сайт в разработке", "доменное имя продается", "временно недоступен", "в разработке", "сайт заблокирован", "document", "как вы здесь оказались", "under construction", "домен продается", "домен продаётся", "just a moment", "домен не прилинкован", "for sale", "домен уже", "площадке интернет", "access denied", "витрина домена", "to centos", "доменное имя", "сайт создан",  "купить домен",
+                "timeweb", "срок регистрации", "404", "403", "welcome to nginx", "доменное имя продается", "временно недоступен", "в разработке", "сайт заблокирован", "document", "как вы здесь оказались", "under construction", "домен продается", "домен продаётся", "just a moment", "домен не прилинкован", "for sale", "домен уже", "площадке интернет", "access denied", "витрина домена", "to centos", "доменное имя", "сайт создан",  "купить домен",
                 "недоступен", "доступ ограничен", "вы владелец сайта", "отключен", "это тестовый", "продаётся домен", "домен не добавлен", "domain name", "не опубликован", "на технической площадке", "blank page", "припаркован", "website", "данный домен", "loading", "captcha", "домен зарегистрирован", "закрыто", "не работает", "доступ к сайту", "default page", "没有找到站点", "сайт успешно", "ещё один сайт", "который можно купить", "по умолчанию", "на реконстркции", "заглушка для сайта", "index of", "not found",
                 "хостинг vps", "файл отсутствует", "report", "без названия", "coming soon",  "error", "домен не настроен", "сайт не запущен", "are not published",
                 "порно", "porn", "sex", "секс", "проститутки", "шлюхи", "хентай", "бдсм", "гей", "геи", "увеличить член", 
                 "1x", "1х", "казино", "casino", "brazzers", "займ", "букмекер", "действие аккаунта приостановлено", 
-                "welcome to adminvps!", "упс! домен не видит хостинг", "запрошенный сайт отсутствует на нашем хостинге", "ukit — сайт не оплачен", "coming soon",
+                "welcome to adminvps!", "упс! домен не видит хостинг", "запрошенный сайт отсутствует на нашем хостинге", "ukit — сайт не оплачен",
                 "pages are not published", "fastpanel", "lptrend | конструктор лендингов", "страница входа", "здоровая росссия", 
                 "РќРµ РѕРїСѓР±Р»РёРєРѕРІР°РЅ", "SpaceWeb", "Success!", "To Bet, игровая платформа", "Alle Bikes", "Настройте домен правильно",
             ],
@@ -74,20 +74,21 @@ class Validator():
         return compiled_banwords
 
 
+    # TODO: Переставить слова местами для оптимизации
     def get_status_banwords(self):
         # Ключевые слова для заголовка
         status_banwords_title = [
-            # Пустые
             {
+                "name": "Empty",
                 "status": 1000,
                 "keywords" : [
-                    "404", "403", "welcome to nginx", "blank page",
-                    "website", "loading", "not found", "error",
-                
+                    "404", "403", "welcome to nginx", "blank page", "coming soon",
+                    "loading", "not found", "error", "To Bet, игровая платформа",
+                    "в разработке", "under construction", "没有找到站点", "доступ заблокирован"
                 ]   
             },
-            # Хостинги
             {
+                "name": "Hosting",
                 "status": 1100,
                 "keywords" : [
                     "timeweb", "срок регистрации", "доменное имя продается",  "домен продается",
@@ -100,134 +101,148 @@ class Validator():
                     "действие аккаунта приостановлено", "ukit — сайт не оплачен", 
                     "welcome to adminvps!", "упс! домен не видит хостинг", "запрошенный сайт отсутствует на нашем хостинге", 
                     "pages are not published", "fastpanel", "lptrend | конструктор лендингов",
-                    "SpaceWeb", "Success!", "To Bet, игровая платформа", "Alle Bikes", "Настройте домен правильно",
+                    "SpaceWeb", "Success!",  "Alle Bikes", "Настройте домен правильно",
+                    "сайт заблокирован", "сайт создан",  "по умолчанию",
                 ]
             },
-            # Порно
             {
+                "name": "Porn",
                 "status": 1200,
                 "keywords" : [
                     "порно", "porn", "sex", "секс", "проститутки", "шлюхи", "brazzers",
-                    "хентай", "бдсм", "гей", "геи", "увеличить член",
+                    "хентай", "бдсм", "геи", "увеличить член",
                 ]
             },
-
-            # Ставки + фишинг
             {
+                "name": "Bets + fishing",
                 "status": 1300,
                 "keywords" : [
                     "1x", "1х", "казино", "casino", "займ", "букмекер",
                 ]
             },
 
-            # Кал
+            # ! ПРИДУМАТЬ КУДА ДЕТЬ
             {
+                "name": "ПРИДУМАААААААТЬ",
                 "status": 1400,
                 "keywords" : [
-                    "здоровая росссия", "РќРµ РѕРїСѓР±Р»РёРєРѕРІР°РЅ", "в разработке",
-                    "сайт заблокирован", "document", "как вы здесь оказались", "under construction", "временно недоступен",
-                    "access denied", "сайт создан", "недоступен", "доступ ограничен", "just a moment",
-                    "закрыто", "доступ к сайту", "default page", "没有找到站点", "ещё один сайт", "по умолчанию",
+                    "здоровая росссия", "РќРµ РѕРїСѓР±Р»РёРєРѕРІР°РЅ",
+                    "как вы здесь оказались", "временно недоступен",
+                    "недоступен", "доступ ограничен", 
+                    "закрыто", "доступ к сайту", "default page",  "ещё один сайт", 
                     "на реконстркции", "заглушка для сайта", "index of",
-                    "без названия", "coming soon", "report",
+                    "без названия", "report",
                 ]
             },       
-            # Обработать вручную
             {
+                "name": "Process anually",
                 "status": 1500,
                 "keywords": [
-                    "страница входа", "captcha",
+                    "страница входа", "captcha", "just a moment",
+                ]
+            },     
+            {
+                "name": "РАНДОМ. ПРОВЕРИТЬ. БЫВАЕТ ПОРНО)))",
+                "status": 1600,
+                "keywords": [
+                    "access denied", "website",
                 ]
             }     
         ]
 
         # Ключевые слова для описания
         status_banwords_description = [
-             # Пустые
             {
+                "name": "Empty",
                 "status": 2000,
                 "keywords" : [
                     "default index page",
                 ]
             },
-            # Нерабочие
             {
+                "name": "Hosting",
                 "status": 2100,
                 "keywords" : [
                     
                 ]
             },
-            # Продажа доменов
             {
+                "name": "Domains shop",
                 "status": 2200,
                 "keywords" : [
                     "магазин доменных имен",
                 ]
             },
-            # Ставки + фишинг
             {
+                "name": "Bets + fishing",
                 "status": 2300,
                 "keywords" : [
                     "ставки", "ставка",
                 ]
             },
-            # Кал
             {
+                "name": "ПРИДУМАААААААТЬ",
                 "status": 2400,
                 "keywords" : [
-                    "ещё один сайт на wordpress",
+                    
                 ]
             },
-            #  Обработать вручную
             {
+                "name": "Manually",
                 "status": 2500,
                 "keywords" : [
                     "закрытый форум",
+                ]
+            },
+            {
+                "name": "РАНДОМ. ПРОВЕРИТЬ!",
+                "status": 2600,
+                "keywords" : [
+                    "ещё один сайт на wordpress"
                 ]
             },
         ]
 
         # Ключевые слова для контента
         status_banwords_content = [
-            # Пустые
             {
+                "name": "Empty",
                 "status": 3000,
                 "keywords" : [
                     "we'll be back soon!", "403 forbidden", "эта страница генерируется автоматически",
                     "если этот сайт принадлежит вам", "сайт находится в стадии разработки",
-                    "добро пожаловать в wordpress",
                 ]
             },
-            # Хостинги
             {
+                "name": "Hosting",
                 "status": 3100,
                 "keywords" : [
                     "reg.ru",
                 ]
             },
-            # Продажа доменов
             {
+                "name": "Domains shop",
                 "status": 3100,
                 "keywords" : [
                     "пусть домен работает", "цифирные домены от", "этот домен продается", "account has been suspended",
                 ]
             },
-            # Ставки + фишинг
             {
+                "name": "Bets + fishing",
                 "status": 3300,
                 "keywords" : [
                     
                 ]
             },
-             # Кал
             {
+                "name": "ПРИДУМАААААТЬ",
                 "status": 3400,
                 "keywords" : [
                     
                 ]
             },
-            #  Обработать вручную
             {
+                "name": "Manually",
                 "status": 3500,
                 "keywords" : [
                     
@@ -253,12 +268,9 @@ class Validator():
 
         for part in compiled_status_banwords.keys():
             for category in status_banwords[part]:
-                if part == "description":
-                    keywords = [re.compile(fr"\b{word.lower()}\b") for word in category["keywords"]]   
-                else:
-                    keywords = [re.compile(f"{word.lower()}") for word in category["keywords"]]
-
+                keywords = [re.compile(fr"\b{word.lower()}\b") for word in category["keywords"]]
                 compiled_status_banwords[part].append({
+                    "name": category["name"],
                     "status": category["status"],
                     "keywords": keywords
                 })
@@ -276,7 +288,7 @@ class Validator():
             for category in self.compiled_status_banwords[part]:
                 for banword in category["keywords"]:
                     if re.search(banword, search_parts[part].lower()):
-                        print(id, category["status"], banword, url, sep=" - ")
+                        print(id, category["name"], category["status"], banword, url, sep=" - ")
                         return category["status"]
         return False
 
@@ -330,9 +342,9 @@ class Validator():
         
         s = time.time()
         for subcategory in self.compiled_tags_categories:
-                for tag in subcategory["tag"]:
-                    text = title + description + bs4.text
-                    rating_dict[subcategory["id"]] += len(re.findall(tag, text))
+            for tag in subcategory["tag"]:
+                text = title + description + bs4.text
+                rating_dict[subcategory["id"]] += len(re.findall(tag, text))
         
         if max(rating_dict) == 0:
             return 0
@@ -385,11 +397,10 @@ class Validator():
     async def find_inn(self, bs4):
         all_inns = list(set(re.findall(self.re_inn_template, bs4.text)))
         correct_inns = []
-
         coefficients_10 = [2, 4, 10, 3, 5, 9, 4, 6, 8, 0]
         coefficients_12_1 = [7, 2, 4, 10, 3, 5, 9, 4, 6, 8, 0, 0]
         coefficients_12_2 = [3, 7, 2, 4, 10, 3, 5, 9, 4, 6, 8, 0]
-
+        
         # Тут должны быть формулы проверки корректности ИНН
         for inn in all_inns:
             if len(inn) == 10:
