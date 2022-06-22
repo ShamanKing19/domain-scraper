@@ -20,9 +20,10 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 class Validator():
     def __init__(self, categories, regions):
-        self.categories = self.get_categories_with_fixed_tags(categories) 
+        self.categories = self.get_categories_with_stripped_tags(categories) 
         self.compiled_tags_categories = self.get_compiled_tags(copy.deepcopy(categories))
         self.compiled_banwords = self.get_compiled_banwords()
+        self.compiled_status_banwords = self.get_compiled_status_banwords()
         self.regions = regions
                 
        # TODO: Довести до идеала регулярки
@@ -34,16 +35,12 @@ class Validator():
         self.re_company_template = re.compile(r"\b[ОПАЗНК]{2,3}\b\s+\b\w+\b")
 
 
-
-    async def identify_company_name(self, bs4):
-        return re.findall(self.re_company_template, bs4.text)
-
-
-    def get_compiled_banwords(self):
+    # TODO: Удалить после проверки корректности status_banwords
+    def get_banwords(self):
         banwords = {
             # без \b...\b
             "title": [
-                "timeweb", "срок регистрации", "404", "403", "welcome to nginx", "сайт в разработке", "доменное имя продается", "временно недоступен", "в разработке", "сайт заблокирован", "document", "как вы здесь оказались", "under construction", "домен продается", "домен продаётся", "just a moment", "домен не прилинкован", "for sale", "домен уже", "площадке интернет", "access denied", "витрина домена", "to centos", "доменное имя", "сайт создан", "надёжно припаркован",  "купить домен",
+                "timeweb", "срок регистрации", "404", "403", "welcome to nginx", "сайт в разработке", "доменное имя продается", "временно недоступен", "в разработке", "сайт заблокирован", "document", "как вы здесь оказались", "under construction", "домен продается", "домен продаётся", "just a moment", "домен не прилинкован", "for sale", "домен уже", "площадке интернет", "access denied", "витрина домена", "to centos", "доменное имя", "сайт создан",  "купить домен",
                 "недоступен", "доступ ограничен", "вы владелец сайта", "отключен", "это тестовый", "продаётся домен", "домен не добавлен", "domain name", "не опубликован", "на технической площадке", "blank page", "припаркован", "website", "данный домен", "loading", "captcha", "домен зарегистрирован", "закрыто", "не работает", "доступ к сайту", "default page", "没有找到站点", "сайт успешно", "ещё один сайт", "который можно купить", "по умолчанию", "на реконстркции", "заглушка для сайта", "index of", "not found",
                 "хостинг vps", "файл отсутствует", "report", "без названия", "coming soon",  "error", "домен не настроен", "сайт не запущен", "are not published",
                 "порно", "porn", "sex", "секс", "проститутки", "шлюхи", "хентай", "бдсм", "гей", "геи", "увеличить член", 
@@ -63,14 +60,255 @@ class Validator():
                 "цифирные домены от", "если этот сайт принадлежит вам", "этот домен продается", "account has been suspended", "сайт находится в стадии разработки",
             ]
         }
+        return banwords
 
+
+    # TODO: Удалить после проверки корректности status_banwords
+    def get_compiled_banwords(self):
+        banwords = self.get_banwords()
         compiled_banwords = {
             "title": [re.compile(fr"{word.lower()}") for word in banwords["title"]], 
             "description": [re.compile(fr"\b{word.lower()}\b") for word in banwords["description"]],
             "content": [re.compile(fr"{word.lower()}") for word in banwords["content"]],
         }
-
         return compiled_banwords
+
+
+    def get_status_banwords(self):
+        # Ключевые слова для заголовка
+        status_banwords_title = [
+            # Пустые
+            {
+                "status": 1000,
+                "keywords" : [
+                    "404", "403", "welcome to nginx", "blank page",
+                    "website", "loading", "not found", "error",
+                
+                ]   
+            },
+            # Хостинги
+            {
+                "status": 1100,
+                "keywords" : [
+                    "timeweb", "срок регистрации", "доменное имя продается",  "домен продается",
+                    "домен продаётся",  "домен не прилинкован", "for sale", "домен уже", "площадке интернет",
+                    "витрина домена", "to centos", "доменное имя", "купить домен",
+                    "вы владелец сайта", "отключен", "это тестовый", "продаётся домен",
+                    "домен не добавлен", "domain name", "не опубликован", "на технической площадке", "припаркован", "данный домен",
+                    "домен зарегистрирован", "не работает", "сайт успешно",  "который можно купить",   
+                    "хостинг vps", "файл отсутствует", "домен не настроен", "сайт не запущен", "are not published",
+                    "действие аккаунта приостановлено", "ukit — сайт не оплачен", 
+                    "welcome to adminvps!", "упс! домен не видит хостинг", "запрошенный сайт отсутствует на нашем хостинге", 
+                    "pages are not published", "fastpanel", "lptrend | конструктор лендингов",
+                    "SpaceWeb", "Success!", "To Bet, игровая платформа", "Alle Bikes", "Настройте домен правильно",
+                ]
+            },
+            # Порно
+            {
+                "status": 1200,
+                "keywords" : [
+                    "порно", "porn", "sex", "секс", "проститутки", "шлюхи", "brazzers",
+                    "хентай", "бдсм", "гей", "геи", "увеличить член",
+                ]
+            },
+
+            # Ставки + фишинг
+            {
+                "status": 1300,
+                "keywords" : [
+                    "1x", "1х", "казино", "casino", "займ", "букмекер",
+                ]
+            },
+
+            # Кал
+            {
+                "status": 1400,
+                "keywords" : [
+                    "здоровая росссия", "РќРµ РѕРїСѓР±Р»РёРєРѕРІР°РЅ", "в разработке",
+                    "сайт заблокирован", "document", "как вы здесь оказались", "under construction", "временно недоступен",
+                    "access denied", "сайт создан", "недоступен", "доступ ограничен", "just a moment",
+                    "закрыто", "доступ к сайту", "default page", "没有找到站点", "ещё один сайт", "по умолчанию",
+                    "на реконстркции", "заглушка для сайта", "index of",
+                    "без названия", "coming soon", "report",
+                ]
+            },       
+            # Обработать вручную
+            {
+                "status": 1500,
+                "keywords": [
+                    "страница входа", "captcha",
+                ]
+            }     
+        ]
+
+        # Ключевые слова для описания
+        status_banwords_description = [
+             # Пустые
+            {
+                "status": 2000,
+                "keywords" : [
+                    "default index page",
+                ]
+            },
+            # Нерабочие
+            {
+                "status": 2100,
+                "keywords" : [
+                    
+                ]
+            },
+            # Продажа доменов
+            {
+                "status": 2200,
+                "keywords" : [
+                    "магазин доменных имен",
+                ]
+            },
+            # Ставки + фишинг
+            {
+                "status": 2300,
+                "keywords" : [
+                    "ставки", "ставка",
+                ]
+            },
+            # Кал
+            {
+                "status": 2400,
+                "keywords" : [
+                    "ещё один сайт на wordpress",
+                ]
+            },
+            #  Обработать вручную
+            {
+                "status": 2500,
+                "keywords" : [
+                    "закрытый форум",
+                ]
+            },
+        ]
+
+        # Ключевые слова для контента
+        status_banwords_content = [
+            # Пустые
+            {
+                "status": 3000,
+                "keywords" : [
+                    "we'll be back soon!", "403 forbidden", "эта страница генерируется автоматически",
+                    "если этот сайт принадлежит вам", "сайт находится в стадии разработки",
+                    "добро пожаловать в wordpress",
+                ]
+            },
+            # Хостинги
+            {
+                "status": 3100,
+                "keywords" : [
+                    "reg.ru",
+                ]
+            },
+            # Продажа доменов
+            {
+                "status": 3100,
+                "keywords" : [
+                    "пусть домен работает", "цифирные домены от", "этот домен продается", "account has been suspended",
+                ]
+            },
+            # Ставки + фишинг
+            {
+                "status": 3300,
+                "keywords" : [
+                    
+                ]
+            },
+             # Кал
+            {
+                "status": 3400,
+                "keywords" : [
+                    
+                ]
+            },
+            #  Обработать вручную
+            {
+                "status": 3500,
+                "keywords" : [
+                    
+                ]
+            },
+        ]
+
+        banwords = {
+            "title": status_banwords_title,
+            "description": status_banwords_description,
+            "content": status_banwords_content,
+        }
+        return banwords
+
+
+    def get_compiled_status_banwords(self):
+        status_banwords = self.get_status_banwords()
+        compiled_status_banwords = {
+            "title": [],
+            "description": [],
+            "content": [],
+        }
+
+        for part in compiled_status_banwords.keys():
+            for category in status_banwords[part]:
+                if part == "description":
+                    keywords = [re.compile(fr"\b{word.lower()}\b") for word in category["keywords"]]   
+                else:
+                    keywords = [re.compile(f"{word.lower()}") for word in category["keywords"]]
+
+                compiled_status_banwords[part].append({
+                    "status": category["status"],
+                    "keywords": keywords
+                })
+        return compiled_status_banwords
+
+
+    async def check_invalid_status(self, bs4, title, description, id, url):
+        search_parts = {
+            "title": title,
+            "description": description,
+            "content": bs4.text,
+        }
+
+        for part in self.compiled_status_banwords.keys():
+            for category in self.compiled_status_banwords[part]:
+                for banword in category["keywords"]:
+                    if re.search(banword, search_parts[part].lower()):
+                        print(id, category["status"], banword, url, sep=" - ")
+                        return category["status"]
+        return False
+
+
+    # TODO: Удалить после проверки корректности status_banwords
+    async def is_valid(self, bs4, title, description, id, url):
+        if not title:
+            return False
+        
+        for banword in self.compiled_banwords["title"]:
+            if re.search(banword, title.lower()):
+                # print(f"{id} - invalid cuz of: {banword} - {url}")
+                return False
+
+        for banword in self.compiled_banwords["description"]:
+            if re.search(banword, description.lower()):
+                # print(f"{id} - invalid cuz of: {banword} - {url}")
+                return False
+
+        for banword in self.compiled_banwords["content"]:
+            if re.search(banword, bs4.text.lower()):
+                # print(f"{id} - invalid cuz of: {banword} - {url}")
+                return False
+            
+        return True
+
+
+    def get_categories_with_stripped_tags(self, categories):
+        for subcategory in categories:
+            tags = [tag.strip() for tag in subcategory["tag"].split(",")]
+            subcategory["tag"] = tags
+        return categories
 
 
     def get_compiled_tags(self, categories):
@@ -79,13 +317,6 @@ class Validator():
             # Компиляция тэгов подкатегории
             for tag in subcategory["tag"]:
                 tags.append(re.compile(fr"\b{tag}\b"))
-            subcategory["tag"] = tags
-        return categories
-
-
-    def get_categories_with_fixed_tags(self, categories):
-        for subcategory in categories:
-            tags = [tag.strip() for tag in subcategory["tag"].split(",")]
             subcategory["tag"] = tags
         return categories
 
@@ -111,6 +342,7 @@ class Validator():
         return result
 
 
+    # TODO: Можно будет удалить и брать данные из запроса по ИНН
     async def identify_city_by_inn(self, inns):
         result_regions = []
         for inn in inns:
@@ -133,23 +365,23 @@ class Validator():
             return cities
 
 
+    # TODO: Возращать нужные данные и сохранять в бд
     async def get_info_by_inn(self, inns, session):
         for inn in inns:
             url = f"https://egrul.itsoft.ru/{inn}.json"
-            print(url)
+            # print(url)
             response = await session.get(url)
-            file = open(f"company_info/{inn}.json", "w", encoding="utf-8")
             response_text = await response.json()
+            # file = open(f"company_info/{inn}.json", "w", encoding="utf-8")
             # finances = response.json()["fin"] 
             # text = json.dumps(response_text, ensure_ascii=False, indent=4) 
             # file.write(text)
             # file.close()
 
 
-    # TODO: Бесплатное API для проверки организации по ИНН
-    # https://htmlweb.ru/service/organization_api.php#api
-    # !Тут ваще всё без ограничений
-    # https://egrul.itsoft.ru/{inn}.json или .xml
+    # Бесплатные API для проверки организации по ИНН
+    # 1). https://htmlweb.ru/service/organization_api.php#api
+    # 2). https://egrul.itsoft.ru/{inn}.json или .xml #* Использую его
     async def find_inn(self, bs4):
         all_inns = list(set(re.findall(self.re_inn_template, bs4.text)))
         correct_inns = []
@@ -246,7 +478,6 @@ class Validator():
             'data-drupal-':  "Drupal",
             '<meta name="generator" content="Joomla':  "Joomla",
             'var dle_admin': "DataLife Engine",
-            # Новые
             'UCOZ-JS': "Ucoz",
             '<script src="https://static.tilda': 'Tilda',
             '<meta name="generator" content="Wix': 'Wix',
@@ -261,31 +492,6 @@ class Validator():
             if keyword in html:
                 return cms_keywords[keyword]
         return "" 
-
-
-    async def is_valid(self, bs4, title, description, id, url):
-        invalid_status_dict = {
-
-        }
-        if not title:
-            return False
-        
-        for banword in self.compiled_banwords["title"]:
-            if re.search(banword, title.lower()):
-                # print(f"{id} - invalid cuz of: {banword} - {url}")
-                return False
-
-        for banword in self.compiled_banwords["description"]:
-            if re.search(banword, description.lower()):
-                # print(f"{id} - invalid cuz of: {banword} - {url}")
-                return False
-
-        for banword in self.compiled_banwords["content"]:
-            if re.search(banword, bs4.text.lower()):
-                # print(f"{id} - invalid cuz of: {banword} - {url}")
-                return False
-            
-        return True
 
 
     async def find_keywords(self, bs4):

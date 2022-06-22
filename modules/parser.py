@@ -91,11 +91,12 @@ class Parser:
         title = await self.validator.find_title(bs4)  
         description = await self.validator.find_description(bs4)
         # TODO: Переделать под возврат категории инвалидного статуса
-        if not await self.validator.is_valid(bs4, title, description, id, real_domain):
+        invalid_status = await self.validator.check_invalid_status(bs4, title, description, id, real_domain)
+        if invalid_status:
             self.db.make_db_request(f"""
                 INSERT INTO {self.statuses_table_name} (id, domain, zone, real_domain, status) 
-                VALUE ('{id}', '{domain}', '{zone}', '{real_domain}', {000})
-                ON DUPLICATE KEY UPDATE real_domain='{real_domain}', status=000
+                VALUE ('{id}', '{domain}', '{zone}', '{real_domain}', {invalid_status})
+                ON DUPLICATE KEY UPDATE real_domain='{real_domain}', status={invalid_status}
             """)
             return
         
