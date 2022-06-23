@@ -376,11 +376,18 @@ class Validator():
 
     # TODO: Возращать нужные данные и сохранять в бд
     async def get_info_by_inn(self, inns, session):
+        inns_data = []
         for inn in inns:
             url = f"https://egrul.itsoft.ru/{inn}.json"
-            response = await session.get(url)
-            response_text = await response.json()
-            
+            try:
+                response = await session.get(url)
+            except ConnectionError as error:
+                print(error)
+            try:
+                response_text = await response.json()
+            except aiohttp.ContentTypeError as error:
+                # print(error)
+                continue
             # Адрес
             try:
                 address = response_text["СвЮЛ"]["СвАдресЮЛ"]["АдресРФ"]
@@ -547,10 +554,12 @@ class Validator():
                 "main_activity": main_type_of_actives_name,
                 "additional_activities": additional_activities
             }
-            file = open(f"company_info/{inn}.json", "w", encoding="utf-8")
-            file.write(json.dumps(company_data, indent=4, ensure_ascii=False))
-            file.close()
-            return company_data
+            # file = open(f"company_info/{inn}.json", "w", encoding="utf-8")
+            # file.write(json.dumps(company_data, indent=4, ensure_ascii=False))
+            # file.close()
+            # print(company_data["name"])
+            inns_data.append(company_data)
+        return inns_data
 
 
 
