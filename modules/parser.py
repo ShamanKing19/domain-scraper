@@ -1,3 +1,4 @@
+import datetime
 import http
 import warnings
 warnings.filterwarnings("ignore")
@@ -19,7 +20,7 @@ from genericpath import exists
 import pymysql
 
 from modules.db_connector import DbConnector
-from modules.table_creator import TableCreator
+from scripts.table_creator import TableCreator
 from modules.validator import Validator
 
 
@@ -90,7 +91,6 @@ class Parser:
         # s = time.time()
         title = await self.validator.find_title(bs4)  
         description = await self.validator.find_description(bs4)
-        # TODO: Переделать под возврат категории инвалидного статуса
         invalid_status = await self.validator.check_invalid_status(bs4, title, description, id, real_domain)
         if invalid_status:
             self.db.make_db_request(f"""
@@ -122,7 +122,7 @@ class Parser:
 
         inn = ",".join(inns) if inns else ""
         cities = ",".join(cities) if cities else ""
-        
+        last_updated = datetime.date.today().strftime('%Y-%m-%d')
 
         # Информация в таблицу domains
         self.db.make_db_request(f"""
@@ -133,9 +133,9 @@ class Parser:
 
         # Информация в таблицу domain_info
         self.db.make_db_request(f"""
-            INSERT INTO {self.domain_info_table_name} (domain_id, title, description, keywords, city, inn, cms, hosting, is_www, is_ssl, is_https_redirect, ip, tag_id) 
-            VALUE ({id}, '{title}', '{description}', '{keywords}', '{cities}', '{inn}', '{cms}', '{hosting}', '{www}', '{is_ssl}', '{is_https_redirect}', '{ip}', {tag_id})
-            ON DUPLICATE KEY UPDATE title='{title}', description='{description}', keywords='{keywords}', city='{cities}', inn='{inn}', cms='{cms}', hosting='{hosting}', is_www='{www}', is_ssl='{is_ssl}', is_https_redirect='{is_https_redirect}',  ip='{ip}', tag_id={tag_id}
+            INSERT INTO {self.domain_info_table_name} (domain_id, title, description, keywords, city, inn, cms, hosting, is_www, is_ssl, is_https_redirect, ip, tag_id, last_updated) 
+            VALUE ({id}, '{title}', '{description}', '{keywords}', '{cities}', '{inn}', '{cms}', '{hosting}', '{www}', '{is_ssl}', '{is_https_redirect}', '{ip}', {tag_id}, '{last_updated}')
+            ON DUPLICATE KEY UPDATE title='{title}', description='{description}', keywords='{keywords}', city='{cities}', inn='{inn}', cms='{cms}', hosting='{hosting}', is_www='{www}', is_ssl='{is_ssl}', is_https_redirect='{is_https_redirect}',  ip='{ip}', tag_id={tag_id}, last_updated='{last_updated}'
         """)
 
         # Информация в таблицу domain_phones
@@ -246,11 +246,10 @@ class Parser:
                 """)
         
         #! Для работы на сервере
-        except (ssl.CertificateError, ValueError, http.cookies.CookieError):
+        except (ssl.CertificateError, ssl.SSLError, http.cookies.CookieError):
             pass
   
         except (pymysql.err.ProgrammingError, pymysql.err.DataError, ValueError) as error:
-            # logging.error(error)
             print(error)
 
         

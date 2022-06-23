@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS `domain_info` (
     `status` VARCHAR(30) DEFAULT 'Отсутствует',
     `comment` TEXT,
     `bitrix_id` BIGINT UNSIGNED,
+    `last_updated` DATE,
+    `last_migrated_to_bitrix` DATE,
     FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`),
     FOREIGN KEY (`tag_id`) REFERENCES `tags` (`id`)
 );
