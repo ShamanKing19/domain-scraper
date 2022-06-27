@@ -106,8 +106,8 @@ class Parser:
         emails = await self.validator.find_emails(bs4)
         inns = await self.validator.find_inn(bs4)
         cities = await self.validator.identify_city_by_inn(inns) if inns else await self.validator.identify_city_by_number(numbers)
-        company_info = await self.validator.get_info_by_inn(inns, self.http_session)
-       
+        # company_info = await self.validator.get_info_by_inn(inns, self.http_session)
+
         tag_id = 0
 
         www = 1 if "www." in real_domain else 0
@@ -250,8 +250,8 @@ class Parser:
             pass
   
         except (pymysql.err.ProgrammingError, pymysql.err.DataError, ValueError) as error:
-            print(error)
-
+            # print(error)
+            pass
         
     async def __parse_all_domains(self):
         requests = []
