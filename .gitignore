@@ -136,6 +136,9 @@ archives
 __pycache__
 
 .vscode
-Дубликаты заголовков.txt
+.txt
 .gitignore
-Проверить.txt
+.json
+test_files/
+company_info/
+data/

@@ -2,12 +2,12 @@ import os
 import pymysql
 
 
-class DbProdConnector:
+class DbConnector:
     def __init__(self):
-        self.db_host = "109.248.133.9"
-        self.db_name = "admin_domains"
-        self.db_user = "admin_domains"
-        self.db_password = "vHVLHeoSrk"
+        self.db_host = os.environ.get("DB_HOST")
+        self.db_name = os.environ.get("DB_DATABASE")
+        self.db_user = os.environ.get("DB_USER")
+        self.db_password = os.environ.get("DB_PASSWORD")
         self.connection = self.__create_connection()
 
     def __create_connection(self):
