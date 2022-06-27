@@ -19,9 +19,7 @@ CREATE TABLE IF NOT EXISTS `company_info`(
     `registry_date` DATE,
     `registry_category` VARCHAR(255),
     `employees_number` INT(10),
-    `main_activity`  VARCHAR(255),  
-    `last_finance_year` INT(4),
-      
+    `main_activity`  VARCHAR(255),    
     FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`),
     UNIQUE KEY (`inn`)
 );

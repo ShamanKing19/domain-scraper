@@ -1,7 +1,4 @@
 import asyncio
-import csv
-import datetime
-import json
 from pprint import pprint
 import time
 
@@ -35,7 +32,6 @@ class InnInfoParser:
         await self.session.close()
 
 
-    # TODO: Возращать нужные данные и сохранять в бд
     async def get_info_by_inn(self, inn, session):
         url = f"https://egrul.itsoft.ru/{inn}.json"
         
@@ -138,6 +134,54 @@ class InnInfoParser:
             authorized_capital_type = ""
             authorized_capital_amount = 0
 
+
+        # try:
+            # Учредители
+        founders_info = []
+        try:
+            founders = response_text["СвЮЛ"]["СвУчредит"]["УчрФЛ"]
+            for founder in founders:
+                if not isinstance(founder, dict): continue
+
+                # Имя
+                try:
+                    first_name = founder["СвФЛ"]["@attributes"]["Имя"]
+                except:
+                    first_name = ""
+                try:
+                    last_name = founder["СвФЛ"]["@attributes"]["Фамилия"]
+                except:
+                    last_name = ""
+                try:
+                    middle_name = founder["СвФЛ"]["@attributes"]["Отчество"]
+                except:
+                    middle_name = ""
+                founder_full_name = f'{last_name} {first_name} {middle_name}' if middle_name else f'{last_name} {first_name}'
+                # инн
+                founder_inn = founder["СвФЛ"]["@attributes"]["ИННФЛ"]
+                
+                # Доля (тыс. руб.)
+                try:
+                    founder_capital_part_amount = founder["ДоляУстКап"]["@attributes"]["НоминСтоим"]
+                    try:
+                        founder_capital_part_percent = founder["ДоляУстКап"]["РазмерДоли"]["Процент"]
+                    except:
+                        founder_capital_part_percent = 0
+                except:
+                    founder_capital_part_amount = 0
+                finally:
+                    founders_info.append(
+                        {
+                            "founder_full_name": founder_full_name,
+                            "founder_inn": founder_inn,
+                            "founder_capital_part_amount": founder_capital_part_amount,
+                            "founder_capital_part_percent": founder_capital_part_percent,
+                        }
+                    ) 
+        except Exception as e:
+            founders = [] 
+
+
         try:
             #! Реестр СМСП микропредприятие
             registry_date = response_text["fin"]["msp"]["@attributes"]["inc_date"]
@@ -206,7 +250,7 @@ class InnInfoParser:
 
 
         
-        # COMPANY_FINANCES
+        # company_finances
         item = ""
         for item in finance_years_data:
             self.db.make_db_request(f"""
@@ -217,26 +261,30 @@ class InnInfoParser:
         segment = self.get_segment(item)
 
 
-        # COMPANY INFO
+        # company_info
         # TODO: Возможно переделать на UPDATE
-        try:
-            self.db.make_db_request(f"""
-                INSERT INTO company_info (inn, name, type, segment, region, city, address, post_index, registration_date, boss_name, boss_post, yandex_reviews, google_reviews, authorized_capital_type, authorized_capital_amount, registry_date, registry_category, employees_number, main_activity) 
-                VALUE ('{inn}', '{company_full_name}', '{company_type}', '{segment}', '{region_name}', '{city_name}', '{full_address}', '{index}', '{registration_date}', '{boss_full_name}', '{boss_post_name}', '{reviews_yandex_maps}', '{reviews_google_maps}', '{authorized_capital_type}', '{authorized_capital_amount}', '{registry_date}', '{registry_category}', '{employees_number}', '{main_type_of_actives_name}')
-                ON DUPLICATE KEY UPDATE inn='{inn}', name='{company_full_name}', type='{company_full_name}', segment='{segment}', region='{region_name}', city='{city_name}', address='{full_address}', post_index='{index}', registration_date='{registration_date}', boss_name='{boss_full_name}', boss_post='{boss_post_name}', yandex_reviews='{reviews_yandex_maps}', google_reviews='{reviews_google_maps}', authorized_capital_type='{authorized_capital_type}', authorized_capital_amount='{authorized_capital_amount}', registry_date='{registry_date}', registry_category='{registry_category}', employees_number='{employees_number}', main_activity='{main_type_of_actives_name}'
-            """)
-        except Exception as e:
-            print(f"Company_info error: {e}")
+        self.db.make_db_request(f"""
+            INSERT INTO company_info (inn, name, type, segment, region, city, address, post_index, registration_date, boss_name, boss_post, yandex_reviews, google_reviews, authorized_capital_type, authorized_capital_amount, registry_date, registry_category, employees_number, main_activity) 
+            VALUE ('{inn}', '{company_full_name}', '{company_type}', '{segment}', '{region_name}', '{city_name}', '{full_address}', '{index}', '{registration_date}', '{boss_full_name}', '{boss_post_name}', '{reviews_yandex_maps}', '{reviews_google_maps}', '{authorized_capital_type}', '{authorized_capital_amount}', '{registry_date}', '{registry_category}', '{employees_number}', '{main_type_of_actives_name}')
+            ON DUPLICATE KEY UPDATE inn='{inn}', name='{company_full_name}', type='{company_full_name}', segment='{segment}', region='{region_name}', city='{city_name}', address='{full_address}', post_index='{index}', registration_date='{registration_date}', boss_name='{boss_full_name}', boss_post='{boss_post_name}', yandex_reviews='{reviews_yandex_maps}', google_reviews='{reviews_google_maps}', authorized_capital_type='{authorized_capital_type}', authorized_capital_amount='{authorized_capital_amount}', registry_date='{registry_date}', registry_category='{registry_category}', employees_number='{employees_number}', main_activity='{main_type_of_actives_name}'
+        """)
  
-        # COMPANY_ADDITIONAL_ACTIVITIES
+        # company_additional_activities
         for item in additional_activities:
             self.db.make_db_request(f"""
                 INSERT INTO company_additional_activities (inn, activity_name) 
                 VALUE ('{inn}', '{item['name']}')
                 ON DUPLICATE KEY UPDATE inn='{inn}', activity_name='{item['name']}'
             """)
-            
 
+        # company_founders
+        for item in founders_info:
+            self.db.make_db_request(f"""
+                INSERT INTO company_founders (inn, founder_full_name, founder_inn, founder_capital_part_amount, founder_capital_part_percent) 
+                VALUE ('{inn}', '{item['founder_full_name']}', '{item['founder_inn']}', '{item['founder_capital_part_amount']}', '{item['founder_capital_part_percent']}')
+                ON DUPLICATE KEY UPDATE inn='{inn}', founder_full_name='{item['founder_full_name']}', founder_inn='{item['founder_inn']}', founder_capital_part_amount='{item['founder_capital_part_amount']}', founder_capital_part_percent='{item['founder_capital_part_percent']}'
+            """)
+            
     def get_segment(self, item):
         if not item: return None  
         # В милилонах!
