@@ -1,11 +1,9 @@
-
 import time
 from multiprocessing import Process
 from modules.db_connector import DbConnector
 from modules.inn_parser import InnInfoParser
 
 def run_parser(portion, offset, inns):
-    # logging.basicConfig(filename="logs.log", encoding="utf-8")
     parser = InnInfoParser(inns)
     parser.run()
 
@@ -17,7 +15,7 @@ def main():
     offset = 0
     portion = 10000
     cores_number = 4
-    start_index = first_id + offset
+    start_index = first_id - 1 + offset
 
     global_start_time = time.time()
     processes = []
@@ -35,6 +33,7 @@ def main():
         process = Process(target=run_parser, args=(step, offset, inns))
         process.start()
         processes.append(process)
+        print(f"С {offset} по {offset+step}")
         if len(processes) == cores_number:
             for process in processes:
                 process.join()

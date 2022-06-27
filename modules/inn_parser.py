@@ -21,25 +21,18 @@ class InnInfoParser:
     def run(self):
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self.parse_inns())
-        asyncio.run(self.session.close())
-        
+            
 
     async def parse_inns(self):
         requests = []
 
-        start = time.time()
-        print("Парсинг началася...")
-        for i, item in enumerate(self.inns):
+        for item in self.inns:
             inn = item["inn"]
             request = self.get_info_by_inn(inn, self.session)
             requests.append(request)    
-            if i  % 1000 == 0:
-                await asyncio.gather(*requests)
-                requests.clear()
-                print(i, time.time() - start, sep=" - ")
-                
+            await asyncio.gather(*requests)
+            requests.clear()
         await self.session.close()
-        print(f"Парсинг закончился за {time.time() - start}")
 
 
     # TODO: Возращать нужные данные и сохранять в бд
@@ -57,14 +50,14 @@ class InnInfoParser:
             return
         
         # Проверка жива ли компания
-        try:
-            if "y2020" not in response_text["fin"].keys():
-                return
-        except:
-            return
-        finally:
-            # print(url)
-            pass
+        # try:
+        #     if "y2020" not in response_text["fin"].keys():
+        #         return
+        # except:
+        #     return
+        # finally:
+        #     # print(url)
+        #     pass
 
         # Адрес
         try:
@@ -241,8 +234,8 @@ class InnInfoParser:
                 INSERT INTO company_additional_activities (inn, activity_name) 
                 VALUE ('{inn}', '{item['name']}')
                 ON DUPLICATE KEY UPDATE inn='{inn}', activity_name='{item['name']}'
-            """)    
-
+            """)
+            
 
     def get_segment(self, item):
         if not item: return None  

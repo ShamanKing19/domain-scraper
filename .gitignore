@@ -142,3 +142,4 @@ __pycache__
 test_files/
 company_info/
 data/
+modules/db_server_connector.py
