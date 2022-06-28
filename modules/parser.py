@@ -157,9 +157,9 @@ class Parser:
 
         for inn in inns:
             self.db.make_db_request(f"""
-                INSERT INTO company_info (inn) 
-                VALUE ('{inn}')
-                ON DUPLICATE KEY UPDATE inn='{inn}'
+                INSERT INTO company_info (domain_id, inn) 
+                VALUE ('{id}', '{inn}')
+                ON DUPLICATE KEY UPDATE domain_id='{id}', inn='{inn}'
             """)
             
 

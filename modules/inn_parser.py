@@ -3,6 +3,7 @@ from pprint import pprint
 import time
 
 import aiohttp
+import pymysql
 
 from modules.db_connector import DbConnector
 
@@ -45,25 +46,29 @@ class InnInfoParser:
         except aiohttp.ContentTypeError as error:
             return
         
-        # Проверка жива ли компания
-        # try:
-        #     if "y2020" not in response_text["fin"].keys():
-        #         return
-        # except:
-        #     return
-        # finally:
-        #     # print(url)
-        #     pass
-
-        # Адрес
+        # Address
         try:
             address = response_text["СвЮЛ"]["СвАдресЮЛ"]["АдресРФ"]
-            
-            index = address["@attributes"]["Индекс"]
-            region_code = address["@attributes"]["КодРегион"]
-            building_number = address["@attributes"]["Дом"]
-            building_floor = address["@attributes"]["Корпус"]
-            building_room_number = address["@attributes"]["Кварт"]
+            try:
+                index = address["@attributes"]["Индекс"]
+            except:
+                index = ""
+            try:
+                region_code = address["@attributes"]["КодРегион"]
+            except:
+                region_code = ""
+            try:    
+                building_number = address["@attributes"]["Дом"]
+            except:
+                building_number = ""
+            try:    
+                building_floor = address["@attributes"]["Корпус"]
+            except:
+                building_floor = ""
+            try:    
+                building_room_number = address["@attributes"]["Кварт"]
+            except:
+                building_room_number = ""
         except Exception as e:
             index = ""
             region_code = ""
@@ -72,52 +77,74 @@ class InnInfoParser:
             building_room_number = ""
 
         try:
-            region_type = address["Регион"]["@attributes"]["ТипРегион"]
             region_name = address["Регион"]["@attributes"]["НаимРегион"]
-        except Exception as e:
-            region_type = ""
+        except:
             region_name = ""
+        try:
+            region_type = address["Регион"]["@attributes"]["ТипРегион"]
+        except:
+            region_type = ""
 
+        try:
+            city_name = address["Город"]["@attributes"]["НаимГород"]
+        except:
+            city_name = ""
         try:
             city_type = address["Город"]["@attributes"]["ТипГород"]
-            city_name = address["Город"]["@attributes"]["НаимГород"]
-        except Exception as e:
+        except:
             city_type = ""
-            city_name = ""
 
+        try:
+            street_name = address["Улица"]["@attributes"]["НаимУлица"]
+        except:
+            street_name = ""
         try:
             street_type = address["Улица"]["@attributes"]["ТипУлица"]
-            street_name = address["Улица"]["@attributes"]["НаимУлица"]
-        except Exception as e:
+        except:
             street_type = ""
-            street_name = ""
 
+        # Название компании
         try:
-            # Название компании
             company_type = response_text["СвЮЛ"]["@attributes"]["ПолнНаимОПФ"]
-            company_full_name = response_text["СвЮЛ"]["СвНаимЮЛ"]["@attributes"]["НаимЮЛПолн"]#.replace('"', "").replace("'", "")
-            company_short_name = response_text["СвЮЛ"]["СвНаимЮЛ"]["@attributes"]["НаимЮЛСокр"]
-        except Exception as e:
+        except:
             company_type = ""
+        try:
+            company_full_name = response_text["СвЮЛ"]["СвНаимЮЛ"]["@attributes"]["НаимЮЛПолн"].replace('\\"', "").replace("'", "")
+        except:
             company_full_name = ""
+        try:
+            company_short_name = response_text["СвЮЛ"]["СвНаимЮЛ"]["@attributes"]["НаимЮЛСокр"].replace('\\"', "").replace("'", "")
+        except:
             company_short_name = ""
 
+        # ФИО, ИНН и должность руководителя
         try:
-            # ФИО, ИНН и должность руководителя
             boss_lastname = response_text["СвЮЛ"]["СведДолжнФЛ"]["СвФЛ"]["@attributes"]["Фамилия"]
-            boss_firstname = response_text["СвЮЛ"]["СведДолжнФЛ"]["СвФЛ"]["@attributes"]["Имя"]
-            boss_middlename = response_text["СвЮЛ"]["СведДолжнФЛ"]["СвФЛ"]["@attributes"]["Отчество"]
-            boss_inn = response_text["СвЮЛ"]["СведДолжнФЛ"]["СвФЛ"]["@attributes"]["ИННФЛ"]
-            boss_post_type_number = response_text["СвЮЛ"]["СведДолжнФЛ"]["СвДолжн"]["@attributes"]["ВидДолжн"]
-            boss_post_type_name = response_text["СвЮЛ"]["СведДолжнФЛ"]["СвДолжн"]["@attributes"]["НаимВидДолжн"]
-            boss_post_name = response_text["СвЮЛ"]["СведДолжнФЛ"]["СвДолжн"]["@attributes"]["НаимДолжн"]
-        except Exception as e:
+        except:
             boss_lastname = ""
+        try:
+            boss_firstname = response_text["СвЮЛ"]["СведДолжнФЛ"]["СвФЛ"]["@attributes"]["Имя"]
+        except:
             boss_firstname = ""
+        try:
+            boss_middlename = response_text["СвЮЛ"]["СведДолжнФЛ"]["СвФЛ"]["@attributes"]["Отчество"]
+        except:
             boss_middlename = ""
+        try:
+            boss_inn = response_text["СвЮЛ"]["СведДолжнФЛ"]["СвФЛ"]["@attributes"]["ИННФЛ"]
+        except:
             boss_inn = ""
+        try:
+            boss_post_type_number = response_text["СвЮЛ"]["СведДолжнФЛ"]["СвДолжн"]["@attributes"]["ВидДолжн"]
+        except:
             boss_post_type_number = ""
+        try:
+            boss_post_type_name = response_text["СвЮЛ"]["СведДолжнФЛ"]["СвДолжн"]["@attributes"]["НаимВидДолжн"]
+        except:
             boss_post_type_name = ""
+        try:
+            boss_post_name = response_text["СвЮЛ"]["СведДолжнФЛ"]["СвДолжн"]["@attributes"]["НаимДолжн"]
+        except:
             boss_post_name = ""
 
         # Дата регистрации
@@ -126,13 +153,15 @@ class InnInfoParser:
         except:
             registration_date = "0000-00-00"
 
+        # Уставный капитал
         try:
-            # Уставный капитал
-            authorized_capital_type = response_text["СвЮЛ"]["СвУстКап"]["@attributes"]["НаимВидКап"]
             authorized_capital_amount = response_text["СвЮЛ"]["СвУстКап"]["@attributes"]["СумКап"]
-        except Exception as e:
-            authorized_capital_type = ""
+        except:
             authorized_capital_amount = 0
+        try:
+            authorized_capital_type = response_text["СвЮЛ"]["СвУстКап"]["@attributes"]["НаимВидКап"]
+        except:
+            authorized_capital_type = ""
 
 
         # try:
@@ -182,13 +211,15 @@ class InnInfoParser:
             founders = [] 
 
 
+        #! Реестр СМСП микропредприятие
         try:
-            #! Реестр СМСП микропредприятие
-            registry_date = response_text["fin"]["msp"]["@attributes"]["inc_date"]
             registry_category = response_text["fin"]["msp"]["@attributes"]["cat"] # Тут номер 1 это "микропредприятие"
-        except Exception as e:
-            registry_date = "0000-00-00"
+        except:
             registry_category = ""
+        try:
+            registry_date = response_text["fin"]["msp"]["@attributes"]["inc_date"]
+        except:
+            registry_date = "0000-00-00"
         
         try:
             # Сотрудники
@@ -215,15 +246,19 @@ class InnInfoParser:
         except Exception as e:
             pass
 
+        ### Виды деятельности
+        # Основной вид деятельности
         try:
-            ### Виды деятельности
-            # Основной вид деятельности
-            main_type_of_actives_code = response_text["СвЮЛ"]["СвОКВЭД"]["СвОКВЭДОсн"]["@attributes"]["КодОКВЭД"]
             main_type_of_actives_name = response_text["СвЮЛ"]["СвОКВЭД"]["СвОКВЭДОсн"]["@attributes"]["НаимОКВЭД"]
-            main_type_of_actives_date = response_text["СвЮЛ"]["СвОКВЭД"]["СвОКВЭДОсн"]["@attributes"]["ПрВерсОКВЭД"]
-        except Exception as e:
-            main_type_of_actives_code = ""
+        except:
             main_type_of_actives_name = ""
+        try:
+            main_type_of_actives_code = response_text["СвЮЛ"]["СвОКВЭД"]["СвОКВЭДОсн"]["@attributes"]["КодОКВЭД"]
+        except:
+            main_type_of_actives_code = ""
+        try:
+            main_type_of_actives_date = response_text["СвЮЛ"]["СвОКВЭД"]["СвОКВЭДОсн"]["@attributes"]["ПрВерсОКВЭД"]
+        except:
             main_type_of_actives_date = ""
 
         try:
@@ -236,20 +271,20 @@ class InnInfoParser:
                     "date": activity["@attributes"]["ПрВерсОКВЭД"],
                 }
                 additional_activities.append(data)
-        except Exception as e:
+        except:
             pass
 
         street = f"{street_type} {street_name}"
         building = f"{building_number}, {building_floor}, {building_room_number}"
-        full_address = f"{street}, {building}" if building_number else street 
+        full_address = f"{street}, {building}".strip(" ,") if building_number else street 
         boss_full_name = f"{boss_lastname} {boss_firstname} {boss_middlename}"
         
-        # ! СДЕЛАТЬ
-        # yandex_url = f"https://yandex.ru/maps/?text={company_short_name}"
-        # print(yandex_url.replace(" ", "%20"))
-        reviews_yandex_maps = ""
-        reviews_google_maps = ""
-
+        location = city_name if city_name else region_name
+        comp_name = company_short_name if company_short_name else company_full_name
+        request_data = [comp_name, location, index]
+        request_data_string = "+".join(request_data).replace(" ", "%20").replace("\"", "").replace("'", "")
+        reviews_yandex_maps = f"https://yandex.ru/maps/?text={request_data_string}"
+        reviews_google_maps = f"https://www.google.ru/maps?q={request_data_string}"
 
         
         # company_finances
@@ -265,10 +300,11 @@ class InnInfoParser:
 
         # company_info
         # TODO: Возможно переделать на UPDATE
+        city = city_name if city_name.strip() else region_name
         self.db.make_db_request(f"""
             INSERT INTO company_info (inn, name, type, segment, region, city, address, post_index, registration_date, boss_name, boss_post, yandex_reviews, google_reviews, authorized_capital_type, authorized_capital_amount, registry_date, registry_category, employees_number, main_activity, last_finance_year) 
-            VALUE ('{inn}', '{company_full_name}', '{company_type}', '{segment}', '{region_name}', '{city_name}', '{full_address}', '{index}', '{registration_date}', '{boss_full_name}', '{boss_post_name}', '{reviews_yandex_maps}', '{reviews_google_maps}', '{authorized_capital_type}', '{authorized_capital_amount}', '{registry_date}', '{registry_category}', '{employees_number}', '{main_type_of_actives_name}', '{last_finance_year}')
-            ON DUPLICATE KEY UPDATE inn='{inn}', name='{company_full_name}', type='{company_full_name}', segment='{segment}', region='{region_name}', city='{city_name}', address='{full_address}', post_index='{index}', registration_date='{registration_date}', boss_name='{boss_full_name}', boss_post='{boss_post_name}', yandex_reviews='{reviews_yandex_maps}', google_reviews='{reviews_google_maps}', authorized_capital_type='{authorized_capital_type}', authorized_capital_amount='{authorized_capital_amount}', registry_date='{registry_date}', registry_category='{registry_category}', employees_number='{employees_number}', main_activity='{main_type_of_actives_name}', last_finance_year={last_finance_year}
+            VALUE ('{inn}', '{company_full_name}', '{company_type}', '{segment}', '{region_name}', '{city}', '{full_address}', '{index}', '{registration_date}', '{boss_full_name}', '{boss_post_name}', '{reviews_yandex_maps}', '{reviews_google_maps}', '{authorized_capital_type}', '{authorized_capital_amount}', '{registry_date}', '{registry_category}', '{employees_number}', '{main_type_of_actives_name}', '{last_finance_year}')
+            ON DUPLICATE KEY UPDATE inn='{inn}', name='{company_full_name}', type='{company_type}', segment='{segment}', region='{region_name}', city='{city}', address='{full_address}', post_index='{index}', registration_date='{registration_date}', boss_name='{boss_full_name}', boss_post='{boss_post_name}', yandex_reviews='{reviews_yandex_maps}', google_reviews='{reviews_google_maps}', authorized_capital_type='{authorized_capital_type}', authorized_capital_amount='{authorized_capital_amount}', registry_date='{registry_date}', registry_category='{registry_category}', employees_number='{employees_number}', main_activity='{main_type_of_actives_name}', last_finance_year={last_finance_year}
         """)
  
         # company_additional_activities
@@ -281,12 +317,16 @@ class InnInfoParser:
 
         # company_founders
         for item in founders_info:
-            self.db.make_db_request(f"""
-                INSERT INTO company_founders (inn, founder_full_name, founder_inn, founder_capital_part_amount, founder_capital_part_percent) 
-                VALUE ('{inn}', '{item['founder_full_name']}', '{item['founder_inn']}', '{item['founder_capital_part_amount']}', '{item['founder_capital_part_percent']}')
-                ON DUPLICATE KEY UPDATE inn='{inn}', founder_full_name='{item['founder_full_name']}', founder_inn='{item['founder_inn']}', founder_capital_part_amount='{item['founder_capital_part_amount']}', founder_capital_part_percent='{item['founder_capital_part_percent']}'
-            """)
-            
+            try:
+                self.db.make_db_request(f"""
+                    INSERT INTO company_founders (inn, founder_full_name, founder_inn, founder_capital_part_amount, founder_capital_part_percent) 
+                    VALUE ('{inn}', '{item['founder_full_name']}', '{item['founder_inn']}', '{item['founder_capital_part_amount']}', '{item['founder_capital_part_percent']}')
+                    ON DUPLICATE KEY UPDATE inn='{inn}', founder_full_name='{item['founder_full_name']}', founder_inn='{item['founder_inn']}', founder_capital_part_amount='{item['founder_capital_part_amount']}', founder_capital_part_percent='{item['founder_capital_part_percent']}'
+                """)
+            except pymysql.err.ProgrammingError as e:
+                file = open("logs.txt", "a", encoding="utf-8")
+                file.write(e)
+                file.close()
             
     def get_segment(self, item):
         if not item: return None  

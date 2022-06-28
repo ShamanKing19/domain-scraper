@@ -441,8 +441,7 @@ class Validator():
             matched_email = re.match(self.re_emails_template, email)
             if matched_email:
                 valid_email = matched_email.string
-                valid_emails.append(valid_email.strip("\"\'"))
-
+                valid_emails.append(valid_email.strip("\"\'.,"))
         return list(set(valid_emails))
 
 
