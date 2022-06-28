@@ -199,6 +199,7 @@ class InnInfoParser:
         try:
             # Финансы в млн. руб. за каждый код
             finance_years_data = []
+            last_finance_year = 0
             for key in response_text["fin"].keys():
                 if key[0] == "y":
                     income = int(response_text["fin"][key]["@attributes"]["income"])
@@ -210,6 +211,7 @@ class InnInfoParser:
                         "profit": round((income - outcome) / 1000000, 2)
                     }
                     finance_years_data.append(data)
+                    last_finance_year = int(data["year"])
         except Exception as e:
             pass
 
@@ -264,9 +266,9 @@ class InnInfoParser:
         # company_info
         # TODO: Возможно переделать на UPDATE
         self.db.make_db_request(f"""
-            INSERT INTO company_info (inn, name, type, segment, region, city, address, post_index, registration_date, boss_name, boss_post, yandex_reviews, google_reviews, authorized_capital_type, authorized_capital_amount, registry_date, registry_category, employees_number, main_activity) 
-            VALUE ('{inn}', '{company_full_name}', '{company_type}', '{segment}', '{region_name}', '{city_name}', '{full_address}', '{index}', '{registration_date}', '{boss_full_name}', '{boss_post_name}', '{reviews_yandex_maps}', '{reviews_google_maps}', '{authorized_capital_type}', '{authorized_capital_amount}', '{registry_date}', '{registry_category}', '{employees_number}', '{main_type_of_actives_name}')
-            ON DUPLICATE KEY UPDATE inn='{inn}', name='{company_full_name}', type='{company_full_name}', segment='{segment}', region='{region_name}', city='{city_name}', address='{full_address}', post_index='{index}', registration_date='{registration_date}', boss_name='{boss_full_name}', boss_post='{boss_post_name}', yandex_reviews='{reviews_yandex_maps}', google_reviews='{reviews_google_maps}', authorized_capital_type='{authorized_capital_type}', authorized_capital_amount='{authorized_capital_amount}', registry_date='{registry_date}', registry_category='{registry_category}', employees_number='{employees_number}', main_activity='{main_type_of_actives_name}'
+            INSERT INTO company_info (inn, name, type, segment, region, city, address, post_index, registration_date, boss_name, boss_post, yandex_reviews, google_reviews, authorized_capital_type, authorized_capital_amount, registry_date, registry_category, employees_number, main_activity, last_finance_year) 
+            VALUE ('{inn}', '{company_full_name}', '{company_type}', '{segment}', '{region_name}', '{city_name}', '{full_address}', '{index}', '{registration_date}', '{boss_full_name}', '{boss_post_name}', '{reviews_yandex_maps}', '{reviews_google_maps}', '{authorized_capital_type}', '{authorized_capital_amount}', '{registry_date}', '{registry_category}', '{employees_number}', '{main_type_of_actives_name}', '{last_finance_year}')
+            ON DUPLICATE KEY UPDATE inn='{inn}', name='{company_full_name}', type='{company_full_name}', segment='{segment}', region='{region_name}', city='{city_name}', address='{full_address}', post_index='{index}', registration_date='{registration_date}', boss_name='{boss_full_name}', boss_post='{boss_post_name}', yandex_reviews='{reviews_yandex_maps}', google_reviews='{reviews_google_maps}', authorized_capital_type='{authorized_capital_type}', authorized_capital_amount='{authorized_capital_amount}', registry_date='{registry_date}', registry_category='{registry_category}', employees_number='{employees_number}', main_activity='{main_type_of_actives_name}', last_finance_year={last_finance_year}
         """)
  
         # company_additional_activities
@@ -284,6 +286,7 @@ class InnInfoParser:
                 VALUE ('{inn}', '{item['founder_full_name']}', '{item['founder_inn']}', '{item['founder_capital_part_amount']}', '{item['founder_capital_part_percent']}')
                 ON DUPLICATE KEY UPDATE inn='{inn}', founder_full_name='{item['founder_full_name']}', founder_inn='{item['founder_inn']}', founder_capital_part_amount='{item['founder_capital_part_amount']}', founder_capital_part_percent='{item['founder_capital_part_percent']}'
             """)
+            
             
     def get_segment(self, item):
         if not item: return None  
@@ -338,5 +341,3 @@ class InnInfoParser:
             turnover = item["income"] + item["outcome"]
             if turnover <= segment["turnover"]:
                 return segment["id"]
-
-
