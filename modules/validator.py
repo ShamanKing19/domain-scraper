@@ -167,10 +167,11 @@ class Validator():
                 ]
             },
             {
-                "name": "Domains shop",
+                "name": "Porn",
                 "status": 2200,
                 "keywords" : [
-                    "магазин доменных имен",
+                    "порно", "porn", "sex", "секс", "проститутки", "шлюхи", "brazzers",
+                    "хентай", "бдсм", "геи", "увеличить член",
                 ]
             },
             {
@@ -199,6 +200,13 @@ class Validator():
                 "status": 2600,
                 "keywords" : [
                     "ещё один сайт на wordpress"
+                ]
+            },
+                        {
+                "name": "Domains shop",
+                "status": 2700,
+                "keywords" : [
+                    "магазин доменных имен",
                 ]
             },
         ]

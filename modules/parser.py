@@ -155,6 +155,13 @@ class Parser:
                 ON DUPLICATE KEY UPDATE email='{email}'
             """)
 
+        for inn in inns:
+            self.db.make_db_request(f"""
+                INSERT INTO company_info (inn) 
+                VALUE ('{inn}')
+                ON DUPLICATE KEY UPDATE inn='{inn}'
+            """)
+            
 
     async def __http_request(self, domain):
         http_url = "http://" + domain
