@@ -125,6 +125,24 @@ class Parser:
         cities = ",".join(cities) if cities else ""
         last_updated = datetime.date.today().strftime('%Y-%m-%d')
 
+        # TODO: Вынести отсюда как-нибудь
+        # Проверка e-commerce сайтов
+        is_ecommerce = 0
+        license_type = ""
+        if cms == "Bitrix" and "Авторизация" not in title:
+            eshop_sections = ["cart", "personal/cart", "shop", "products", "catalog", "basket", "katalog", "korzina"]
+            requests = []
+            
+            for section in eshop_sections:
+                requests.append(self.http_session.get(real_domain.strip("/") + "/" + section))
+            
+            responses = await asyncio.gather(*requests)
+            for response in responses:
+                if response.status == 200: 
+                    is_ecommerce = 1
+                    if is_ecommerce: break
+
+
         # Информация в таблицу domains
         self.db.make_db_request(f"""
             INSERT INTO {self.statuses_table_name} (id, domain, zone, real_domain, status) 
@@ -134,9 +152,9 @@ class Parser:
 
         # Информация в таблицу domain_info
         self.db.make_db_request(f"""
-            INSERT INTO {self.domain_info_table_name} (domain_id, title, description, keywords, city, inn, cms, hosting, is_www, is_ssl, is_https_redirect, ip, tag_id, last_updated) 
-            VALUE ({id}, '{title}', '{description}', '{keywords}', '{cities}', '{inn}', '{cms}', '{hosting}', '{www}', '{is_ssl}', '{is_https_redirect}', '{ip}', {tag_id}, '{last_updated}')
-            ON DUPLICATE KEY UPDATE title='{title}', description='{description}', keywords='{keywords}', city='{cities}', inn='{inn}', cms='{cms}', hosting='{hosting}', is_www='{www}', is_ssl='{is_ssl}', is_https_redirect='{is_https_redirect}',  ip='{ip}', tag_id={tag_id}, last_updated='{last_updated}'
+            INSERT INTO {self.domain_info_table_name} (domain_id, title, description, keywords, city, inn, cms, hosting, is_www, is_ssl, is_https_redirect, ip, tag_id, is_ecommerce, license_type, last_updated) 
+            VALUE ({id}, '{title}', '{description}', '{keywords}', '{cities}', '{inn}', '{cms}', '{hosting}', '{www}', '{is_ssl}', '{is_https_redirect}', '{ip}', {tag_id}, {is_ecommerce}, '{license_type}', '{last_updated}')
+            ON DUPLICATE KEY UPDATE title='{title}', description='{description}', keywords='{keywords}', city='{cities}', inn='{inn}', cms='{cms}', hosting='{hosting}', is_www='{www}', is_ssl='{is_ssl}', is_https_redirect='{is_https_redirect}',  ip='{ip}', tag_id={tag_id}, is_ecommerce={is_ecommerce}, license_type='{license_type}',  last_updated='{last_updated}'
         """)
 
         # Информация в таблицу domain_phones
@@ -270,7 +288,7 @@ class Parser:
             domain_base_info = {
                 "domain": domain["domain"],
                 "id": domain["id"],
-                "zone": domain["zone"],
+                "zone": domain.get("zone", "ru"),
                 "start_time": start_time
             }
             requests.append(self.__make_domain_request(domain_base_info))

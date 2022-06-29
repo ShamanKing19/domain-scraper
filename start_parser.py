@@ -1,6 +1,7 @@
 import argparse
 from multiprocessing import Process
 import os
+from pprint import pprint
 import time
 
 from dotenv import load_dotenv
@@ -63,7 +64,17 @@ def main():
 
     for offset in range(start_index, domains_count + start_index, step):
         portion_start_time = time.time()
+        
+        # Парсинг всех сайтов
         domains = DbConnector().make_db_request(f"SELECT * FROM domains WHERE id >= {offset} LIMIT {step}")
+        
+        # Только сайты на 1С:Bitrix
+        # bitrix_domains = DbConnector().make_db_request(f"""
+        #     SELECT domain_id as id, real_domain as domain FROM domain_info
+        #     INNER JOIN domains ON domain_info.domain_id = domains.id
+        #     WHERE cms=\"Bitrix\" AND domain_id >= {offset} LIMIT {step}
+        # """)
+
         process = Process(target=run_parser, args=(step, offset, domains))
         process.start()
         processes.append(process)

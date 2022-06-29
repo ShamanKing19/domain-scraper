@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS `domain_info` (
     `tag_id` INT NULL,
     `status` VARCHAR(30) DEFAULT 'Отсутствует',
     `comment` TEXT,
+    `is_ecommerce` BOOLEAN,
+    `license_type` VARCHAR(50),
     `bitrix_id` BIGINT UNSIGNED,
     `last_updated` DATE,
     `last_migrated_to_bitrix` DATE,
