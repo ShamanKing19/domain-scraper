@@ -20,8 +20,8 @@ from genericpath import exists
 import pymysql
 
 from modules.db_connector import DbConnector
-from scripts.table_creator import TableCreator
 from modules.validator import Validator
+from scripts.table_creator import TableCreator
 
 
 class Parser:
@@ -45,10 +45,11 @@ class Parser:
 
         ### Параметры парсера ###
         # Можно разбить на connection и readtimeout
-        self.timeout = 5
+        self.connection_timeout = 5
+        self.read_timeout = 60
         self.every_printable = 10000
 
-        session_timeout = aiohttp.ClientTimeout(total=None, sock_connect=self.timeout, sock_read=self.timeout)
+        session_timeout = aiohttp.ClientTimeout(total=None, sock_connect=self.connection_timeout, sock_read=self.read_timeout)
         https_connector = aiohttp.TCPConnector(verify_ssl=True, limit=10000)
         http_connector = aiohttp.TCPConnector(verify_ssl=False, limit=10000)
         self.https_session = aiohttp.ClientSession(connector=https_connector, timeout=session_timeout)
