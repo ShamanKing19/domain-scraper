@@ -2,11 +2,11 @@ import csv
 import time
 
 from pymysql import IntegrityError
-from modules.db_server_connector import DbServerConnector
+from db_connector import DbConnector
 
 
 def load_rows():
-    db = DbServerConnector()
+    db = DbConnector()
     print("Загрузка началась...")
     start = time.time()
 
@@ -15,7 +15,7 @@ def load_rows():
         inns = set()
 
         for i, row in enumerate(reader):
-            inns.add(row["inn"])
+            inns.add(row["inn"]) 
             if i % 100000 == 0 and i != 0: 
                 print(i)
                 

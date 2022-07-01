@@ -201,7 +201,7 @@ class Parser:
     async def __make_domain_request(self, domain_base_info):
         id = domain_base_info["id"]
         domain = domain_base_info["domain"]
-        zone = domain_base_info["zone"]
+        zone = domain_base_info.get("zone", "ru")
 
         try:
             results = await asyncio.gather(self.__http_request(domain_base_info["domain"]), self.__https_request(domain_base_info["domain"]), return_exceptions=False)

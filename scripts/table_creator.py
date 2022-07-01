@@ -69,9 +69,17 @@ class TableCreator:
         with open("migrations/company_finances_migration.sql", "r", encoding="utf-8") as migration:
             self.db.make_db_request(migration.read()) 
         
+        # additional_activities_migration TABLE creation
+        with open("migrations/additional_activities_migration.sql", "r", encoding="utf-8") as migration:
+            self.db.make_db_request(migration.read())
+        
         # company_additional_activities_migration TABLE creation
         with open("migrations/company_additional_activities_migration.sql", "r", encoding="utf-8") as migration:
-            self.db.make_db_request(migration.read()) 
+            self.db.make_db_request(migration.read())
+         
+        # company_founders_migration TABLE creation
+        with open("migrations/company_founders_migration.sql", "r", encoding="utf-8") as migration:
+            self.db.make_db_request(migration.read())
 
 
 

@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS `company_info`(
     `region` VARCHAR(500),
     `city` VARCHAR(255),
     `address` VARCHAR(255),
-    `index` VARCHAR(20),
+    `post_index` VARCHAR(20),
     `registration_date` DATE,
     `boss_name` VARCHAR(255),
     `boss_post` VARCHAR(255),
