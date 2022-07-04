@@ -94,14 +94,14 @@ class Parser:
         description = await self.validator.find_description(bs4)
         invalid_status = await self.validator.check_invalid_status(bs4, title, description, id, real_domain)
         cms = await self.validator.identify_cms(html)
-        if cms != "Bitrix": 
-            if invalid_status:
-                self.db.make_db_request(f"""
-                    INSERT INTO {self.statuses_table_name} (id, domain, zone, real_domain, status) 
-                    VALUE ('{id}', '{domain}', '{zone}', '{real_domain}', {invalid_status})
-                    ON DUPLICATE KEY UPDATE real_domain='{real_domain}', status={invalid_status}
-                """)
-                return
+        if invalid_status:
+            if cms == "Bitrix": invalid_status = 228
+            self.db.make_db_request(f"""
+                INSERT INTO {self.statuses_table_name} (id, domain, zone, real_domain, status) 
+                VALUE ('{id}', '{domain}', '{zone}', '{real_domain}', {invalid_status})
+                ON DUPLICATE KEY UPDATE real_domain='{real_domain}', status={invalid_status}
+            """)
+            return
         
         keywords = await self.validator.find_keywords(bs4)
         numbers = await self.validator.find_phone_numbers(bs4)
