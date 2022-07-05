@@ -42,7 +42,7 @@ def main():
     if args.offset:
         offset = int(args.offset)
     # * Количество процессов парсера
-    cores_number = 4
+    cores_number = 6
     if args.cores:
         cores_number = int(args.cores)
     # * Одновременно обрабатываемая порция

@@ -22,7 +22,6 @@ class Validator():
     def __init__(self, categories, regions):
         self.categories = self.get_categories_with_stripped_tags(categories) 
         self.compiled_tags_categories = self.get_compiled_tags(copy.deepcopy(categories))
-        self.compiled_banwords = self.get_compiled_banwords()
         self.compiled_status_banwords = self.get_compiled_status_banwords()
         self.regions = regions
                 
@@ -33,45 +32,6 @@ class Validator():
 
         self.re_inn_template = re.compile(r"\b\d{4}\d{6}\d{2}\b|\b\d{4}\d{5}\d{1}\b")
         self.re_company_template = re.compile(r"\b[ОПАЗНК]{2,3}\b\s+\b\w+\b")
-
-
-    # TODO: Удалить после проверки корректности status_banwords
-    def get_banwords(self):
-        banwords = {
-            # без \b...\b
-            "title": [
-                "timeweb", "срок регистрации", "404", "403", "welcome to nginx", "доменное имя продается", "временно недоступен", "в разработке", "сайт заблокирован", "document", "как вы здесь оказались", "under construction", "домен продается", "домен продаётся", "just a moment", "домен не прилинкован", "for sale", "домен уже", "площадке интернет", "access denied", "витрина домена", "to centos", "доменное имя", "сайт создан",  "купить домен",
-                "недоступен", "доступ ограничен", "вы владелец сайта", "отключен", "это тестовый", "продаётся домен", "домен не добавлен", "domain name", "не опубликован", "на технической площадке", "blank page", "припаркован", "website", "данный домен", "loading", "captcha", "домен зарегистрирован", "закрыто", "не работает", "доступ к сайту", "default page", "没有找到站点", "сайт успешно", "ещё один сайт", "который можно купить", "по умолчанию", "на реконстркции", "заглушка для сайта", "index of", "not found",
-                "хостинг vps", "файл отсутствует", "report", "без названия", "coming soon",  "error", "домен не настроен", "сайт не запущен", "are not published",
-                "порно", "porn", "sex", "секс", "проститутки", "шлюхи", "хентай", "бдсм", "гей", "геи", "увеличить член", 
-                "1x", "1х", "казино", "casino", "brazzers", "займ", "букмекер", "действие аккаунта приостановлено", 
-                "welcome to adminvps!", "упс! домен не видит хостинг", "запрошенный сайт отсутствует на нашем хостинге", "ukit — сайт не оплачен",
-                "pages are not published", "fastpanel", "fastpanel2", "lptrend | конструктор лендингов", "страница входа", "здоровая росссия", 
-                "РќРµ РѕРїСѓР±Р»РёРєРѕРІР°РЅ", "SpaceWeb", "Success!", "To Bet, игровая платформа", "Alle Bikes", "Настройте домен правильно",
-            ],
-            # с \b...\b
-            "description" : [
-                "описание сайта", "магазин доменных имен", "ставки", "ставка",  "default index page", "ещё один сайт на wordpress",
-                "закрытый форум", 
-            ],
-            # без \b...\b
-            "content" : [
-                "reg.ru", "we'll be back soon!", "пусть домен работает", "добро пожаловать в wordpress", "403 forbidden", "эта страница генерируется автоматически",
-                "цифирные домены от", "если этот сайт принадлежит вам", "этот домен продается", "account has been suspended", "сайт находится в стадии разработки",
-            ]
-        }
-        return banwords
-
-
-    # TODO: Удалить после проверки корректности status_banwords
-    def get_compiled_banwords(self):
-        banwords = self.get_banwords()
-        compiled_banwords = {
-            "title": [re.compile(fr"{word.lower()}") for word in banwords["title"]], 
-            "description": [re.compile(fr"\b{word.lower()}\b") for word in banwords["description"]],
-            "content": [re.compile(fr"{word.lower()}") for word in banwords["content"]],
-        }
-        return compiled_banwords
 
 
     # TODO: Переставить слова местами для оптимизации
@@ -100,9 +60,9 @@ class Validator():
                     "хостинг vps", "файл отсутствует", "домен не настроен", "сайт не запущен", "are not published",
                     "действие аккаунта приостановлено", "ukit — сайт не оплачен", 
                     "welcome to adminvps!", "упс! домен не видит хостинг", "запрошенный сайт отсутствует на нашем хостинге", 
-                    "pages are not published", "fastpanel", "lptrend | конструктор лендингов",
+                    "pages are not published", "fastpanel", "FASTPANEL2", "lptrend | конструктор лендингов",
                     "SpaceWeb", "Success!",  "Alle Bikes", "Настройте домен правильно",
-                    "сайт заблокирован", "сайт создан",  "по умолчанию",
+                    "сайт заблокирован", "сайт создан",
                 ]
             },
             {
@@ -297,28 +257,8 @@ class Validator():
                 for banword in category["keywords"]:
                     if re.search(banword, search_parts[part].lower()):
                         # print(id, category["name"], category["status"], banword, url, sep=" - ")
-                        return category["status"]
-        return False
-
-
-    # TODO: Удалить после проверки корректности status_banwords
-    async def is_valid(self, bs4, title, description, id, url):
-        if not title:
-            return False
-        
-        for banword in self.compiled_banwords["title"]:
-            if re.search(banword, title.lower()):
-                return False
-
-        for banword in self.compiled_banwords["description"]:
-            if re.search(banword, description.lower()):
-                return False
-
-        for banword in self.compiled_banwords["content"]:
-            if re.search(banword, bs4.text.lower()):
-                return False
-            
-        return True
+                        return [category["status"], banword]
+        return [False]
 
 
     def get_categories_with_stripped_tags(self, categories):
@@ -468,7 +408,8 @@ class Validator():
 
     async def identify_cms(self, html):
         cms_keywords = {
-            '/bitrix/js/main': "Bitrix",
+            'src="/bitrix/': "Bitrix",
+            '<link href="/bitrix':"Bitrix",
             '/wp-content/themes/':  "Wordpress",
             '<meta name="modxru':  "ModX",
             '<script type="text/javascript" src="/netcat':  "Netcat",
@@ -482,9 +423,9 @@ class Validator():
             'UCOZ-JS': "Ucoz",
             '<script src="https://static.tilda': 'Tilda',
             '<meta name="generator" content="Wix': 'Wix',
-            'href="https://nethouse.ru/?p': 'Nethouse', #? Проверить
+            'href="https://nethouse.ru/?p': 'Nethouse', # TODO: Проверить
             'data-muse-uid': 'Adobe Muse',
-            'img src="/images/cms/': 'UMI', #? Проверить
+            'img src="/images/cms/': 'UMI', # TODO: Проверить
             '-= Amiro.CMS (c) =-': 'Amiro',
             'content="CMS EDGESTILE SiteEdit">': 'SiteEdit',
             'meta name="generator" content="OkayCMS': 'Okay'

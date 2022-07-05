@@ -46,7 +46,7 @@ class Parser:
         ### Параметры парсера ###
         # Можно разбить на connection и readtimeout
         self.connection_timeout = 5
-        self.read_timeout = 60
+        self.read_timeout = 5
         self.every_printable = 10000
 
         session_timeout = aiohttp.ClientTimeout(total=None, sock_connect=self.connection_timeout, sock_read=self.read_timeout)
@@ -92,10 +92,16 @@ class Parser:
         # s = time.time()
         title = await self.validator.find_title(bs4)  
         description = await self.validator.find_description(bs4)
-        invalid_status = await self.validator.check_invalid_status(bs4, title, description, id, real_domain)
+        invalid_result =  await self.validator.check_invalid_status(bs4, title, description, id, real_domain)
+        invalid_status = invalid_result[0]
+        banword = "" if len(invalid_result) == 1 else invalid_result[1]
         cms = await self.validator.identify_cms(html)
         if invalid_status:
-            if cms == "Bitrix": invalid_status = 228
+            if cms == "Bitrix":
+                invalid_status = 228
+                file = open("bitrix.txt", "a", encoding="utf-8")
+                file.write(f"{real_domain} - {invalid_status} - {banword}\n")
+                file.close()
             self.db.make_db_request(f"""
                 INSERT INTO {self.statuses_table_name} (id, domain, zone, real_domain, status) 
                 VALUE ('{id}', '{domain}', '{zone}', '{real_domain}', {invalid_status})
@@ -142,7 +148,6 @@ class Parser:
                 if response.status == 200: 
                     is_ecommerce = 1
                     if is_ecommerce: break
-
 
         # Информация в таблицу domains
         self.db.make_db_request(f"""

@@ -1,0 +1,1 @@
+SELECT COUNT(*) FROM domains WHERE status=408;
