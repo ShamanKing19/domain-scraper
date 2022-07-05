@@ -5,6 +5,7 @@ from pprint import pprint
 import time
 
 from dotenv import load_dotenv
+from tqdm import tqdm
 
 from modules.dbConnector import DbConnector
 from modules.domainParser import Parser
@@ -17,7 +18,6 @@ def LoadDotEnv():
 
 
 def RunParser(portion, offset, domains):
-    # logging.basicConfig(filename="logs.log", encoding="utf-8")
     parser = Parser(domains)
     parser.Run()
 
@@ -61,7 +61,7 @@ def main():
         step = domainsCount
         coresNumber = 1
 
-    for offset in range(startIndex, domainsCount + startIndex, step):
+    for offset in tqdm(range(startIndex, domainsCount + startIndex, step)):
         portionStartTime = time.time()
         
         # Парсинг всех сайтов

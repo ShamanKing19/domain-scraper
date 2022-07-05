@@ -62,7 +62,7 @@ class Validator():
                     "welcome to adminvps!", "упс! домен не видит хостинг", "запрошенный сайт отсутствует на нашем хостинге", 
                     "pages are not published", "fastpanel", "FASTPANEL2", "lptrend | конструктор лендингов",
                     "SpaceWeb", "Success!",  "Alle Bikes", "Настройте домен правильно",
-                    "сайт заблокирован", "сайт создан",
+                    "сайт заблокирован", "сайт создан", "купить красивый домен",
                 ]
             },
             {
@@ -77,7 +77,7 @@ class Validator():
                 "name": "Bets + fishing",
                 "status": 1300,
                 "keywords" : [
-                    "1x", "1х", "казино", "casino", "займ", "букмекер",
+                    "1x", "1х", "казино", "casino", "займ", "букмекер", "Займы до 500 000"
                 ]
             },
 
@@ -106,6 +106,13 @@ class Validator():
                 "status": 1600,
                 "keywords": [
                     "access denied", "website",
+                ]
+            }     
+            {
+                "name": "Domains shop)))",
+                "status": 1700,
+                "keywords": [
+                    "Domenomania",
                 ]
             }     
         ]
@@ -185,7 +192,7 @@ class Validator():
                 "name": "Hosting",
                 "status": 3100,
                 "keywords" : [
-                    "reg.ru",
+                    "reg.ru", "ISPsystem © 1997-",
                 ]
             },
             {
