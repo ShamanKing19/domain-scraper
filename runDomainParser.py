@@ -5,10 +5,15 @@ from pprint import pprint
 import time
 
 from dotenv import load_dotenv
-from tqdm import tqdm
 
 from modules.dbConnector import DbConnector
 from modules.domainParser import Parser
+
+
+def putIn(filename, content):
+    file = open(filename, "a", encoding="utf-8")
+    file.write(content + "\n")
+    file.close()
 
 
 def LoadDotEnv():
@@ -32,9 +37,9 @@ def main():
     argParser.add_argument("--portion")
     args = argParser.parse_args()
 
-    domainsCount = DbConnector().MakeSingleDbRequest(
-        "SELECT count(*) FROM domains")["count(*)"]
+    domainsCount = DbConnector().MakeSingleDbRequest("SELECT count(*) FROM domains")["count(*)"]
     firstId = DbConnector().MakeSingleDbRequest("SELECT id FROM domains ORDER BY id ASC LIMIT 1")["id"]
+    lastId = DbConnector().MakeSingleDbRequest("SELECT id FROM domains ORDER BY id DESC LIMIT 1")["id"]
 
     # * Начальный индекс для парсинга
     offset = 0
@@ -45,7 +50,7 @@ def main():
     if args.cores:
         coresNumber = int(args.cores)
     # * Одновременно обрабатываемая порция
-    portion = 10000
+    portion = 1000
     if args.portion:
         portion = int(args.portion)
 
@@ -61,11 +66,11 @@ def main():
         step = domainsCount
         coresNumber = 1
 
-    for offset in tqdm(range(startIndex, domainsCount + startIndex, step)):
+    while offset < lastId:
         portionStartTime = time.time()
-        
         # Парсинг всех сайтов
-        domains = DbConnector().MakeDbRequest(f"SELECT * FROM domains WHERE id >= {offset} LIMIT {step}")
+        domains = DbConnector().MakeDbRequest(f"SELECT * FROM domains WHERE id > {offset} LIMIT {step}")
+        offset = domains[-1]["id"]
 
         process = Process(target=RunParser, args=(step, offset, domains))
         process.start()
@@ -75,6 +80,7 @@ def main():
                 process.join()
             processes.clear()
             print(f"С {offset-(step*3)} по {offset+step} за {time.time() - portionStartTime} - Общее время парсинга: {time.time() - globalStartTime}")
+            putIn("stats.txt", f"С {offset-(step*3)} по {offset+step} за {time.time() - portionStartTime} - Общее время парсинга: {time.time() - globalStartTime}")
 
     print(f"Парсинг c {startIndex} по {domainsCount} закончился за {time.time() - globalStartTime}")
 

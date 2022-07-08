@@ -45,7 +45,7 @@ class Parser:
 
         ### Параметры парсера ###
         self.connectionTimeout = 5
-        self.readTimeout = 5
+        self.readTimeout = 30
         self.everyPrintable = 10000
 
         sessionTimeout = aiohttp.ClientTimeout(total=None, sock_connect=self.connectionTimeout, sock_read=self.readTimeout)
@@ -100,7 +100,7 @@ class Parser:
         if invalidStatus:
             if cms == "Bitrix":
                 invalidStatus = 228
-                file = open("bitrixNew.txt", "a", encoding="utf-8")
+                file = open("bitrixInvalid.txt", "a", encoding="utf-8")
                 file.write(f"{realDomain} - {invalidStatus} - {banword}\n")
                 file.close()
             self.db.MakeDbRequest(f"""
@@ -143,12 +143,16 @@ class Parser:
             
             for section in eshopSections:
                 requests.append(self.httpSession.get(realDomain.strip("/") + "/" + section))
+            try:
+                responses = await asyncio.gather(*requests)
+            except Exception as e:
+                responses = []
             
-            responses = await asyncio.gather(*requests)
             for response in responses:
                 if response.status == 200: 
                     isEcommerce = 1
                     if isEcommerce: break
+
 
         # Информация в таблицу domains
         self.db.MakeDbRequest(f"""
