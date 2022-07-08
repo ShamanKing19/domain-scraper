@@ -107,7 +107,7 @@ class Validator():
                 "keywords": [
                     "access denied", "website",
                 ]
-            }     
+            },   
             {
                 "name": "Domains shop)))",
                 "status": 1700,

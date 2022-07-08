@@ -7,7 +7,7 @@ import time
 from dotenv import load_dotenv
 
 from modules.dbConnector import DbConnector
-from modules.domainParser import Parser
+from modules.domainParser408 import Parser408
 
 
 def LoadDotEnv():
@@ -17,7 +17,7 @@ def LoadDotEnv():
 
 
 def RunParser(portion, offset, domains):
-    parser = Parser(domains)
+    parser = Parser408(domains)
     parser.Run()
 
 
@@ -34,17 +34,18 @@ def main():
     domainsCount = DbConnector().MakeSingleDbRequest(
         "SELECT count(*) FROM domains")["count(*)"]
     firstId = DbConnector().MakeSingleDbRequest("SELECT id FROM domains ORDER BY id ASC LIMIT 1")["id"]
+    lastId = DbConnector().MakeSingleDbRequest("SELECT id FROM domains ORDER BY id DESC LIMIT 1")["id"]
 
     # * Начальный индекс для парсинга
     offset = 0
     if args.offset:
         offset = int(args.offset)
     # * Количество процессов парсера
-    coresNumber = 1
+    coresNumber = 2
     if args.cores:
         coresNumber = int(args.cores)
     # * Одновременно обрабатываемая порция
-    portion = 10000
+    portion = 1000
     if args.portion:
         portion = int(args.portion)
 
@@ -60,13 +61,11 @@ def main():
         step = domainsCount
         coresNumber = 1
 
-    while offset <= domainsCount + startIndex:
-    # for offset in range(startIndex, domainsCount + startIndex, step):
+    while offset < lastId:
         portionStartTime = time.time()
         
         # Парсинг всех сайтов
-        domains = DbConnector().MakeDbRequest(f"SELECT DISTINCT * FROM domains WHERE id >= {offset} AND status=408 LIMIT {step}")
-        offset += step
+        domains = DbConnector().MakeDbRequest(f"SELECT * FROM domains WHERE id >= {offset} AND status=408 LIMIT {step}")
         offset = domains[-1]["id"]
 
         process = Process(target=RunParser, args=(step, offset, domains))

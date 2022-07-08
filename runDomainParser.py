@@ -68,6 +68,7 @@ def main():
 
     while offset < lastId:
         portionStartTime = time.time()
+        
         # Парсинг всех сайтов
         domains = DbConnector().MakeDbRequest(f"SELECT * FROM domains WHERE id > {offset} LIMIT {step}")
         offset = domains[-1]["id"]
