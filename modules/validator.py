@@ -20,9 +20,9 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 class Validator():
     def __init__(self, categories, regions):
-        self.categories = self.GetCategoriesWithStrippedTags(categories) 
-        self.compiledTagsCategories = self.GetCompiledTags(copy.deepcopy(categories))
-        self.compiledStatusBanwords = self.GetCompiledStatusBanwords()
+        self.categories = self.getCategoriesWithStrippedTags(categories) 
+        self.compiledTagsCategories = self.getCompiledTags(copy.deepcopy(categories))
+        self.compiledStatusBanwords = self.getCompiledStatusBanwords()
         self.regions = regions
                 
        # TODO: Довести до идеала регулярки
@@ -35,7 +35,7 @@ class Validator():
 
 
     # TODO: Переставить слова местами для оптимизации
-    def GetStatusBanwords(self):
+    def getStatusBanwords(self):
         # Ключевые слова для заголовка
         statusBanwordsTitle = [
             {
@@ -233,8 +233,8 @@ class Validator():
         return banwords
 
 
-    def GetCompiledStatusBanwords(self):
-        statusBanwords = self.GetStatusBanwords()
+    def getCompiledStatusBanwords(self):
+        statusBanwords = self.getStatusBanwords()
         compiledStatusBanwords = {
             "title": [],
             "description": [],
@@ -252,7 +252,7 @@ class Validator():
         return compiledStatusBanwords
 
 
-    async def CheckInvalidStatus(self, bs4, title, description, id, url):
+    async def checkInvalidStatus(self, bs4, title, description, id, url):
         searchParts = {
             "title": title,
             "description": description,
@@ -268,14 +268,14 @@ class Validator():
         return [False]
 
 
-    def GetCategoriesWithStrippedTags(self, categories):
+    def getCategoriesWithStrippedTags(self, categories):
         for subcategory in categories:
             tags = [tag.strip() for tag in subcategory["tag"].split(",")]
             subcategory["tag"] = tags
         return categories
 
 
-    def GetCompiledTags(self, categories):
+    def getCompiledTags(self, categories):
         for subcategory in categories:
             tags = []
             # Компиляция тэгов подкатегории
@@ -286,7 +286,7 @@ class Validator():
 
 
     # ! Мегапрожорливый и медленный, но точный
-    async def IdentifyCategory(self, bs4, title, description, url):
+    async def identifyCategory(self, bs4, title, description, url):
         ratingDict = {}
         # Установки начального рейтинга
         for subcategory in self.compiledTagsCategories:
@@ -307,7 +307,7 @@ class Validator():
 
 
     # TODO: Можно будет удалить и брать данные из запроса по ИНН
-    async def IdentifyCityByInn(self, inns):
+    async def identifyCityByInn(self, inns):
         resultRegions = []
         for inn in inns:
             for region in self.regions:
@@ -316,7 +316,7 @@ class Validator():
         return resultRegions
 
 
-    async def IdentifyCityByNumber(self, numbers):
+    async def identifyCityByNumber(self, numbers):
         cities = []
         try:
             for number in numbers:
@@ -332,7 +332,7 @@ class Validator():
     # Бесплатные API для проверки организации по ИНН
     # 1). https://htmlweb.ru/service/organization_api.php#api
     # 2). https://egrul.itsoft.ru/{inn}.json или .xml #* Использую его
-    async def FindInn(self, bs4):
+    async def findInn(self, bs4):
         allInns = list(set(re.findall(self.reInnTemplate, bs4.text)))
         correctInns = []
         coefficients_10 = [2, 4, 10, 3, 5, 9, 4, 6, 8, 0]
@@ -372,7 +372,7 @@ class Validator():
             return []
 
 
-    async def FindEmails(self, bs4):
+    async def findEmails(self, bs4):
         # Поиск по тексту
         rawEmails = re.findall(self.reEmailsTemplate, bs4.text)
         validEmails = []
@@ -392,7 +392,7 @@ class Validator():
         return list(set(validEmails))
 
 
-    async def FindPhoneNumbers(self, bs4):
+    async def findPhoneNumbers(self, bs4):
         # Поиск номеров в тексте
         rawNumbers = re.findall(self.reNumbersTemplate, bs4.text)
         validNumbers = []
@@ -413,7 +413,7 @@ class Validator():
         return list(set(validNumbers))
         
 
-    async def IdentifyCms(self, html):
+    async def identifyCms(self, html):
         cmsKeywords = {
             'src="/bitrix/': "Bitrix",
             '<link href="/bitrix':"Bitrix",
@@ -443,19 +443,19 @@ class Validator():
         return "" 
 
 
-    async def FindKeywords(self, bs4):
+    async def findKeywords(self, bs4):
         keywords = bs4.find("meta", {"name": "keywords"})
         if not keywords or "content" not in keywords.attrs.keys(): return ""
         return keywords["content"].replace("\n", "").replace('"', "").replace("'", "").strip()
 
 
-    async def FindDescription(self, bs4):
+    async def findDescription(self, bs4):
         description = bs4.find("meta", {"name": "description"})
         if not description or "content" not in description.attrs.keys(): return ""
         return description["content"].replace("\n", "").replace('"', "").replace("'", "").strip()
         
 
-    async def FindTitle(self, bs4):
+    async def findTitle(self, bs4):
         title = bs4.find("title")
         if not title: return "" 
         return title.get_text().replace("\n", "").replace('"', "").replace("'", "").strip()

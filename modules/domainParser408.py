@@ -62,60 +62,60 @@ class Parser408:
         # TODO: Сделать чтобы в случае чтения с файла он тоже брал инфу порциями
         else:
             table_creator = TableCreator()
-            table_creator.CreateTables()
-            self.DownloadRuDomainsFileIfNotExists()
-            self.domains = self.GetRowsFromTxt()
+            table_creator.createTables()
+            self.downloadRuDomainsFileIfNotExists()
+            self.domains = self.detRowsFromTxt()
             self.domainsCount = len(self.domains)
 
         ### Подготовленные данные для парсинга
         # Категории
-        self.categories = self.db.MakeDbRequest("""
+        self.categories = self.db.makeDbRequest("""
                     SELECT category.name, subcategory.name, tags.tag, tags.id FROM category
                     RIGHT JOIN subcategory ON category.id = subcategory.category_id
                     INNER JOIN tags ON subcategory.id = tags.id
                 """)
         # Регионы
-        self.regions = self.db.MakeDbRequest("""
+        self.regions = self.db.makeDbRequest("""
                     SELECT * FROM regions
                 """)
         self.validator = Validator(self.categories, self.regions)
 
 
-    def Run(self):
+    def run(self):
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.ParseAllDomains())
+        loop.run_until_complete(self.parseAllDomains())
         
 
-    async def SaveSiteInfo(self, id, domain, zone, response, isSsl, isHttpsRedirect, html):
+    async def saveSiteInfo(self, id, domain, zone, response, isSsl, isHttpsRedirect, html):
         start = time.time()
         realDomain = str(response.real_url.human_repr())
         bs4 = BeautifulSoup(html, "lxml")
 
         # s = time.time()
-        title = await self.validator.FindTitle(bs4)  
-        description = await self.validator.FindDescription(bs4)
-        invalidResult =  await self.validator.CheckInvalidStatus(bs4, title, description, id, realDomain)
+        title = await self.validator.findTitle(bs4)  
+        description = await self.validator.findDescription(bs4)
+        invalidResult =  await self.validator.checkInvalidStatus(bs4, title, description, id, realDomain)
         invalidStatus = invalidResult[0]
         banword = "" if len(invalidResult) == 1 else invalidResult[1]
-        cms = await self.validator.IdentifyCms(html)
+        cms = await self.validator.identifyCms(html)
         if invalidStatus:
             if cms == "Bitrix":
                 invalidStatus = 228
                 file = open("bitrixNew.txt", "a", encoding="utf-8")
                 file.write(f"{realDomain} - {invalidStatus} - {banword}\n")
                 file.close()
-            self.db.MakeDbRequest(f"""
+            self.db.makeDbRequest(f"""
                 INSERT INTO {self.statusesTableName} (id, domain, zone, real_domain, status) 
                 VALUE ('{id}', '{domain}', '{zone}', '{realDomain}', {invalidStatus})
                 ON DUPLICATE KEY UPDATE real_domain='{realDomain}', status={invalidStatus}
             """)
             return
         
-        keywords = await self.validator.FindKeywords(bs4)
-        numbers = await self.validator.FindPhoneNumbers(bs4)
-        emails = await self.validator.FindEmails(bs4)
-        inns = await self.validator.FindInn(bs4)
-        cities = await self.validator.IdentifyCityByInn(inns) if inns else await self.validator.IdentifyCityByNumber(numbers)
+        keywords = await self.validator.findKeywords(bs4)
+        numbers = await self.validator.findPhoneNumbers(bs4)
+        emails = await self.validator.findEmails(bs4)
+        inns = await self.validator.findInn(bs4)
+        cities = await self.validator.identifyCityByInn(inns) if inns else await self.validator.identifyCityByNumber(numbers)
         # companyInfo = await self.validator.get_info_by_inn(inns, self.http_session)
         tagId = 0
 
@@ -151,14 +151,14 @@ class Parser408:
                     if isEcommerce: break
 
         # Информация в таблицу domains
-        self.db.MakeDbRequest(f"""
+        self.db.makeDbRequest(f"""
             INSERT INTO {self.statusesTableName} (id, domain, zone, real_domain, status) 
             VALUE ('{id}', '{domain}', '{zone}', '{realDomain}', {200})
             ON DUPLICATE KEY UPDATE real_domain='{realDomain}', status=200
         """)
 
         # Информация в таблицу domain_info
-        self.db.MakeDbRequest(f"""
+        self.db.makeDbRequest(f"""
             INSERT INTO {self.domainInfoTableName} (domain_id, title, description, keywords, city, inn, cms, hosting, is_www, is_ssl, is_https_redirect, ip, tag_id, is_ecommerce, license_type, last_updated) 
             VALUE ({id}, '{title}', '{description}', '{keywords}', '{cities}', '{inn}', '{cms}', '{hosting}', '{www}', '{isSsl}', '{isHttpsRedirect}', '{ip}', {tagId}, {isEcommerce}, '{licenseType}', '{lastUpdated}')
             ON DUPLICATE KEY UPDATE title='{title}', description='{description}', keywords='{keywords}', city='{cities}', inn='{inn}', cms='{cms}', hosting='{hosting}', is_www='{www}', is_ssl='{isSsl}', is_https_redirect='{isHttpsRedirect}',  ip='{ip}', tag_id={tagId}, is_ecommerce={isEcommerce}, license_type='{licenseType}',  last_updated='{lastUpdated}'
@@ -166,7 +166,7 @@ class Parser408:
 
         # Информация в таблицу domain_phones
         for number in numbers:
-            self.db.MakeDbRequest(f"""
+            self.db.makeDbRequest(f"""
                 INSERT INTO {self.domainPhonesTableName} (domain_id, number) 
                 VALUE ({id}, {number})
                 ON DUPLICATE KEY UPDATE number='{number}'
@@ -175,45 +175,43 @@ class Parser408:
         # Информация в таблицу domain_emails
         for email in emails:
             email = email.strip()
-            self.db.MakeDbRequest(f"""
+            self.db.makeDbRequest(f"""
                 INSERT INTO {self.domainEmailsTableName} (domain_id, email) 
                 VALUE ({id}, '{email}')
                 ON DUPLICATE KEY UPDATE email='{email}'
             """)
 
         for inn in inns:
-            self.db.MakeDbRequest(f"""
+            self.db.makeDbRequest(f"""
                 INSERT INTO company_info (domain_id, inn) 
                 VALUE ('{id}', '{inn}')
                 ON DUPLICATE KEY UPDATE domain_id='{id}', inn='{inn}'
             """)
-        
-        print(id, time.time() - start, sep=" - ")
-            
+                    
 
-    async def HttpRequest(self, domain):
+    async def httpRequest(self, domain):
         httpUrl = "http://" + domain
-        response = await self.httpSession.get(httpUrl, headers=self.GetHeaders())
+        response = await self.httpSession.get(httpUrl, headers=self.getHeaders())
         return response
 
 
-    async def HttpsRequest(self, domain):
+    async def httpsRequest(self, domain):
         try:
             httpsUrl = "https://" + domain
-            response = await self.httpsSession.get(httpsUrl, headers=self.GetHeaders())
+            response = await self.httpsSession.get(httpsUrl, headers=self.getHeaders())
             return response
         
         except (ssl.CertificateError, aiohttp.client_exceptions.ClientConnectorCertificateError):
             return False
 
   
-    async def MakeDomainRequest(self, domainBaseInfo):
+    async def makeDomainRequest(self, domainBaseInfo):
         id = domainBaseInfo["id"]
         domain = domainBaseInfo["domain"]
         zone = domainBaseInfo.get("zone", "ru")
 
         try:
-            results = await asyncio.gather(self.HttpRequest(domainBaseInfo["domain"]), self.HttpsRequest(domainBaseInfo["domain"]), return_exceptions=False)
+            results = await asyncio.gather(self.httpRequest(domainBaseInfo["domain"]), self.httpsRequest(domainBaseInfo["domain"]), return_exceptions=False)
             httpResponse = results[0]
             httpsResponse = results[1]
 
@@ -227,10 +225,10 @@ class Parser408:
 
             if httpResponse.status == 200:
                 html = await httpResponse.text()
-                await self.SaveSiteInfo(id, domain, zone, httpResponse, isSsl, isHttpsRedirect, html)
+                await self.saveSiteInfo(id, domain, zone, httpResponse, isSsl, isHttpsRedirect, html)
                 
             elif httpResponse.status:
-                self.db.MakeDbRequest(f"""
+                self.db.makeDbRequest(f"""
                     UPDATE {self.statusesTableName} 
                     SET status={httpResponse.status}
                     WHERE id = {id}    
@@ -242,7 +240,7 @@ class Parser408:
             aiohttp.client_exceptions.ClientOSError,
             ConnectionResetError,
         ) as error:
-            self.db.MakeDbRequest(f"""
+            self.db.makeDbRequest(f"""
                     UPDATE {self.statusesTableName}
                     SET status = 404
                     WHERE id = {id}
@@ -253,7 +251,7 @@ class Parser408:
             aiohttp.client_exceptions.ClientPayloadError,
             aiohttp.client_exceptions.ClientResponseError
         ) as error:
-            self.db.MakeDbRequest(f"""
+            self.db.makeDbRequest(f"""
                     UPDATE {self.statusesTableName}
                     SET status = 400
                     WHERE id = {id}
@@ -261,7 +259,7 @@ class Parser408:
 
         # status TimeoutError = 408 status
         except aiohttp.client_exceptions.ServerTimeoutError as error:
-            self.db.MakeDbRequest(f"""
+            self.db.makeDbRequest(f"""
                     UPDATE {self.statusesTableName}
                     SET status = 408
                     WHERE id = {id}
@@ -274,7 +272,7 @@ class Parser408:
         
         # status = 888
         except (UnicodeDecodeError, UnicodeEncodeError,) as error:
-            self.db.MakeDbRequest(f"""
+            self.db.makeDbRequest(f"""
                     UPDATE {self.statusesTableName}
                     SET status = 888
                     WHERE id = {id}
@@ -288,7 +286,7 @@ class Parser408:
             # print(error)
             pass
         
-    async def ParseAllDomains(self):
+    async def parseAllDomains(self):
         requests = []
         startTime = time.time()
 
@@ -300,7 +298,7 @@ class Parser408:
                 "zone": domain.get("zone", "ru"),
                 "start_time": startTime
             }
-            requests.append(self.MakeDomainRequest(domainBaseInfo))
+            requests.append(self.makeDomainRequest(domainBaseInfo))
             
         # TODO: Разбить на 4 части и запустить 4 процесса
         await asyncio.gather(*requests)
@@ -311,7 +309,7 @@ class Parser408:
 
 
 
-    def DownloadRuDomainsFileIfNotExists(self):
+    def downloadRuDomainsFileIfNotExists(self):
         if (exists(self.filePath)):
             return
         if not (exists(self.archivesPath)):
@@ -330,7 +328,7 @@ class Parser408:
         os.remove(self.ruArchivePath)
         print("Архив удалён")
 
-    def GetRowsFromTxt(self):
+    def detRowsFromTxt(self):
         domains = []
         startTime = time.time()
         counter = 0
@@ -346,7 +344,7 @@ class Parser408:
         print(f"Файл прочитан за {time.time() - startTime}")
         return domains
 
-    def GetHeaders(self):
+    def getHeaders(self):
         userAgents = {
             "User-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
             "User-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:95.0) Gecko/20100101 Firefox/95.0",

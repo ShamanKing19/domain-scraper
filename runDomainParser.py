@@ -16,19 +16,19 @@ def putIn(filename, content):
     file.close()
 
 
-def LoadDotEnv():
+def loadDotEnv():
     dotenvPath = os.path.join(os.path.dirname(__file__), ".env")
     if os.path.exists(dotenvPath):
         load_dotenv(dotenvPath)
 
 
-def RunParser(portion, offset, domains):
+def runParser(portion, offset, domains):
     parser = Parser(domains)
-    parser.Run()
+    parser.run()
 
 
 def main():
-    LoadDotEnv()
+    loadDotEnv()
 
     # Настройка аргументов при запуске через консоль
     argParser = argparse.ArgumentParser()
@@ -37,9 +37,9 @@ def main():
     argParser.add_argument("--portion")
     args = argParser.parse_args()
 
-    domainsCount = DbConnector().MakeSingleDbRequest("SELECT count(*) FROM domains")["count(*)"]
-    firstId = DbConnector().MakeSingleDbRequest("SELECT id FROM domains ORDER BY id ASC LIMIT 1")["id"]
-    lastId = DbConnector().MakeSingleDbRequest("SELECT id FROM domains ORDER BY id DESC LIMIT 1")["id"]
+    domainsCount = DbConnector().makeSingleDbRequest("SELECT count(*) FROM domains")["count(*)"]
+    firstId = DbConnector().makeSingleDbRequest("SELECT id FROM domains ORDER BY id ASC LIMIT 1")["id"]
+    lastId = DbConnector().makeSingleDbRequest("SELECT id FROM domains ORDER BY id DESC LIMIT 1")["id"]
 
     # * Начальный индекс для парсинга
     offset = 0
@@ -70,10 +70,10 @@ def main():
         portionStartTime = time.time()
         
         # Парсинг всех сайтов
-        domains = DbConnector().MakeDbRequest(f"SELECT * FROM domains WHERE id > {offset} LIMIT {step}")
+        domains = DbConnector().makeDbRequest(f"SELECT * FROM domains WHERE id > {offset} LIMIT {step}")
         offset = domains[-1]["id"]
 
-        process = Process(target=RunParser, args=(step, offset, domains))
+        process = Process(target=runParser, args=(step, offset, domains))
         process.start()
         processes.append(process)
         if len(processes) == coresNumber:
