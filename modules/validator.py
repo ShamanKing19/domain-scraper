@@ -109,7 +109,7 @@ class Validator():
                 ]
             },   
             {
-                "name": "Domains shop)))",
+                "name": "Domains shop",
                 "status": 1700,
                 "keywords": [
                     "Domenomania",
@@ -235,12 +235,21 @@ class Validator():
 
     def getCompiledStatusBanwords(self):
         statusBanwords = self.getStatusBanwords()
+        
+        additionalTitleRegularExpressions = [
+            {
+                    "name": "Domains shop",
+                    "status": 1700,
+                    "keywords": [r"\b[Дд]омен\b[a-zA-Zа-яА-Я0-9\.\-\s]*\bпрода[её]тся\b"]
+            }
+        ]
+
         compiledStatusBanwords = {
-            "title": [],
+            "title": [*additionalTitleRegularExpressions],
             "description": [],
             "content": [],
         }
-
+        
         for part in compiledStatusBanwords.keys():
             for category in statusBanwords[part]:
                 keywords = [re.compile(fr"\b{word.lower()}\b") for word in category["keywords"]]
