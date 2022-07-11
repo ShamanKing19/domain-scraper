@@ -26,13 +26,6 @@ from scripts.tableCreator import TableCreator
 
 class Parser:
     def __init__(self, domains):
-        # Данные для скачивания файла
-        self.downloadLink = "https://statonline.ru/domainlist/file?tld="
-        self.archivesPath = "archives"
-        self.ruArchivePath = "archives/ru.zip"
-        self.extractedFilesPath = "archives/extracted"
-        self.filePath = "archives/extracted/ru_domains.txt"
-
         self.statusesTableName = "domains"
         self.domainInfoTableName = "domain_info"
         self.domainPhonesTableName = "domain_phones"
@@ -213,6 +206,8 @@ class Parser:
         id = domainBaseInfo["id"]
         domain = domainBaseInfo["domain"]
         zone = domainBaseInfo.get("zone", "ru")
+        previousStatus = domainBaseInfo["previousStatus"]
+        newStatus = 0
 
         try:
             results = await asyncio.gather(self.httpRequest(domainBaseInfo["domain"]), self.httpsRequest(domainBaseInfo["domain"]), return_exceptions=False)
@@ -230,44 +225,30 @@ class Parser:
             if httpResponse.status == 200:
                 html = await httpResponse.text()
                 await self.saveSiteInfo(id, domain, zone, httpResponse, isSsl, isHttpsRedirect, html)
-                
-            elif httpResponse.status:
-                self.db.makeDbRequest(f"""
-                    UPDATE {self.statusesTableName} 
-                    SET status={httpResponse.status}
-                    WHERE id = {id}    
-                """)
 
-        # status = 404
+            #! Не меняю статус если сайт хоть раз отдавал 200
+            elif previousStatus == 200:
+                pass
+
+            elif httpResponse.status:
+                newStatus = httpResponse.status
+
         except (
             aiohttp.client_exceptions.ClientConnectorError,
             aiohttp.client_exceptions.ClientOSError,
             ConnectionResetError,
         ) as error:
-            self.db.makeDbRequest(f"""
-                    UPDATE {self.statusesTableName}
-                    SET status = 404
-                    WHERE id = {id}
-                """)
+            newStatus = 404
 
-        # status = 400
         except (
             aiohttp.client_exceptions.ClientPayloadError,
             aiohttp.client_exceptions.ClientResponseError
         ) as error:
-            self.db.makeDbRequest(f"""
-                    UPDATE {self.statusesTableName}
-                    SET status = 400
-                    WHERE id = {id}
-                """)
+            newStatus = 400
 
         # status TimeoutError = 408 status
         except aiohttp.client_exceptions.ServerTimeoutError as error:
-            self.db.makeDbRequest(f"""
-                    UPDATE {self.statusesTableName}
-                    SET status = 408
-                    WHERE id = {id}
-                """)
+            newStatus = 408
 
         except aiohttp.client_exceptions.ServerDisconnectedError as error:
             # TODO: Придумать как обойти это
@@ -276,11 +257,7 @@ class Parser:
         
         # status = 888
         except (UnicodeDecodeError, UnicodeEncodeError,) as error:
-            self.db.makeDbRequest(f"""
-                    UPDATE {self.statusesTableName}
-                    SET status = 888
-                    WHERE id = {id}
-                """)
+            newStatus = 888
         
         #! Для работы на сервере
         except (ssl.CertificateError, ssl.SSLError, http.cookies.CookieError):
@@ -289,6 +266,15 @@ class Parser:
         except (pymysql.err.ProgrammingError, pymysql.err.DataError, ValueError) as error:
             # print(error)
             pass
+
+
+        finally:
+            if previousStatus != 200:
+                self.db.makeDbRequest(f"""
+                    UPDATE {self.statusesTableName}
+                    SET status = {newStatus}
+                    WHERE id = {id}
+                """)
         
     async def parseAllDomains(self):
         requests = []
@@ -300,7 +286,8 @@ class Parser:
                 "domain": domain["domain"],
                 "id": domain["id"],
                 "zone": domain.get("zone", "ru"),
-                "start_time": startTime
+                "start_time": startTime,
+                "previousStatus": domain.get("status", 0)
             }
             requests.append(self.makeDomainRequest(domainBaseInfo))
             
@@ -312,24 +299,29 @@ class Parser:
         # print(f"-------- Обработка {self.domains_count} запросов заняла  {time.time() - start_time} секунд --------")
 
 
-
     def downloadRuDomainsFileIfNotExists(self):
-        if (exists(self.filePath)):
+        downloadLink = "https://statonline.ru/domainlist/file?tld="
+        archivesPath = "archives"
+        ruArchivePath = "archives/ru.zip"
+        extractedFilesPath = "archives/extracted"
+        filePath = "archives/extracted/ru_domains.txt"
+        
+        if (exists(filePath)):
             return
-        if not (exists(self.archivesPath)):
-            os.mkdir(self.archivesPath)
-        if not (exists(self.extractedFilesPath)):
-            os.mkdir(self.extractedFilesPath)
+        if not (exists(archivesPath)):
+            os.mkdir(archivesPath)
+        if not (exists(extractedFilesPath)):
+            os.mkdir(extractedFilesPath)
         start_time = time.time()
         print("Началась загрузка архива с доменами...")
-        urlretrieve(self.downloadLink, self.ruArchivePath)
+        urlretrieve(downloadLink, ruArchivePath)
         print(f"Файл загружен за {time.time() - start_time}")
 
         print("Начата распаковка файла")
-        with zipfile.ZipFile(self.ruArchivePath, "r") as zip_file:
-            zip_file.extractall(self.extractedFilesPath)
+        with zipfile.ZipFile(ruArchivePath, "r") as zip_file:
+            zip_file.extractall(extractedFilesPath)
         print("Файл распакован")
-        os.remove(self.ruArchivePath)
+        os.remove(ruArchivePath)
         print("Архив удалён")
 
 

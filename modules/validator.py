@@ -238,10 +238,15 @@ class Validator():
         
         additionalTitleRegularExpressions = [
             {
+                    "name": "Bets + fishing",
+                    "status": 1300,
+                    "keywords": [r"1xbet"]
+            },
+            {
                     "name": "Domains shop",
                     "status": 1700,
                     "keywords": [r"\b[Дд]омен\b[a-zA-Zа-яА-Я0-9\.\-\s]*\bпрода[её]тся\b"]
-            }
+            },
         ]
 
         compiledStatusBanwords = {

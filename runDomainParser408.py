@@ -7,7 +7,7 @@ import time
 from dotenv import load_dotenv
 
 from modules.dbConnector import DbConnector
-from modules.domainParser408 import Parser408
+from modules.domainParser import Parser
 
 
 def loadDotEnv():
@@ -17,7 +17,9 @@ def loadDotEnv():
 
 
 def runParser(portion, offset, domains):
-    parser = Parser408(domains)
+    parser = Parser(domains)
+    parser.connectionTimeout = 30
+    parser.readTimeout = 60
     parser.run()
 
 
