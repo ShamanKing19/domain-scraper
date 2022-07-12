@@ -67,8 +67,10 @@ def main():
         coresNumber = 1
 
     while offset < lastId:
+        # Только для вывода
+        startId = offset
         portionStartTime = time.time()
-        
+
         # Парсинг всех сайтов
         domains = DbConnector().makeDbRequest(f"SELECT * FROM domains WHERE id > {offset} LIMIT {step}")
         offset = domains[-1]["id"]
@@ -80,8 +82,9 @@ def main():
             for process in processes:
                 process.join()
             processes.clear()
-            print(f"С {offset-portion} по {offset} за {time.time() - portionStartTime} - Общее время парсинга: {time.time() - globalStartTime}")
-            putIn("stats.txt", f"С {offset-portion} по {offset} за {time.time() - portionStartTime} - Общее время парсинга: {time.time() - globalStartTime}")
+            infoString = f"С {startId - (step*(coresNumber-1))} по {offset} за {time.time() - portionStartTime} - Общее время парсинга: {time.time() - globalStartTime}"
+            print(infoString)
+            putIn("stats.txt", infoString)
 
     print(f"Парсинг c {startIndex} по {domainsCount} закончился за {time.time() - globalStartTime}")
 

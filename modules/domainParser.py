@@ -1,5 +1,6 @@
 import datetime
 import http
+import json
 from pprint import pprint
 import warnings
 warnings.filterwarnings("ignore")
@@ -48,8 +49,11 @@ class Parser:
         self.httpsSession = aiohttp.ClientSession(connector=httpsConnector, timeout=sessionTimeout)
         self.httpSession = aiohttp.ClientSession(connector=httpConnector, timeout=sessionTimeout, trust_env=True)
 
-        # self.geoApi = "https://geolocation-db.com/jsonp/"
-        self.geoApi = "https://ipinfo.io/{ip}/json"
+        
+        # self.geoApi = "https://ipinfo.io/{{ip}}/json" #* Тут лимит 50к запросов в месяц, но определяет что угодно. САМАЯ ТОЧНАЯ
+        # self.geoApi = "https://geolocation-db.com/jsonp/{{ip}}" #* не очень апишка, много ошибок
+        # self.geoApi = "https://api.hostip.info/get_html.php?ip={{ip}}&position=true" #* Тоже не очень, мало находит
+        self.geoApi = "https://ipgeolocation.abstractapi.com/v1/?api_key=f4b61e710fd846c48350bd35faacfc51&ip_address={{ip}}"
 
         # Получение списка доменов и создание таблиц
         # request_time = time.time()
@@ -146,13 +150,22 @@ class Parser:
 
         try:
             ip = socket.gethostbyname(response.host)
-            if ip:
-                ipInfoResponse = await self.httpSession.get(self.geoApi.replace("{ip}", ip))
-                ipInfo = await ipInfoResponse.json()
-                country = ipInfo["country"]
         except:
             ip = ""
+        
+        try:
             country = ""
+            if ip:
+                pass
+                # ipInfoResponse = await self.httpSession.get(self.geoApi.replace("{{ip}}", ip))
+                # ipInfo = await ipInfoResponse.json()
+                # pprint(ipInfo)
+                # ipInfoFormatted = ipInfo.replace("callback", "").strip("()")
+                # ipInfoJson = json.loads(ipInfoFormatted)
+                # country = ipInfoJson.get("country_code", "")
+        except Exception as e:
+            print(e)
+            
 
         try:
             hosting = whois.whois(realDomain)["registrar"]
