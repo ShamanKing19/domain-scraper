@@ -136,6 +136,7 @@ class Parser:
                     inns += newInns
             emails = list(set(emails))
             numbers = list(set(numbers))
+            inns = list(set(inns))
 
         tagId = 0
         inn = ",".join(inns) if inns else ""
@@ -162,23 +163,47 @@ class Parser:
         # TODO: Вынести отсюда как-нибудь или объединить с другими запросами
         # Проверка e-commerce сайтов
         isEcommerce = 0
+        hasCatalog = 0
+        hasCart = 0
         licenseType = ""
-        if cms == "Bitrix" and "Авторизация" not in title:
-            eshopSections = ["cart", "personal/cart", "shop", "products", "catalog", "basket", "katalog", "korzina"]
-            requests = []
+        if cms == "Bitrix" and "Авторизация" not in title and "auth" not in realDomain:
+            catalogSections = ["catalog", "products", "shop", "katalog"]
+            cartSections = ["cart", "personal/cart", "basket", "korzina"]
             
-            for section in eshopSections:
-                requests.append(self.httpSession.get(realDomain.strip("/") + "/" + section))
+            # Поиск каталога
+            catalogRequests = []
+            for section in catalogSections:
+                catalogRequests.append(self.httpSession.get(realDomain.strip("/") + "/" + section))
+            
+            # Поиск корзины
+            cartRequests = []
+            for section in cartSections:
+                cartRequests.append(self.httpSession.get(realDomain.strip("/") + "/" + section))
+            
             try:
-                responses = await asyncio.gather(*requests)
-            except Exception as e:
-                responses = []
+                cartResponses = await asyncio.gather(*cartRequests)
+            except:
+                cartResponses = []
             
-            for response in responses:
+            for response in cartResponses:
                 if response.status == 200: 
-                    isEcommerce = 1
-                    if isEcommerce: break
-
+                    hasCart = 1
+                    if hasCart:
+                        hasCatalog = 1
+                        break
+            
+            if not hasCart:
+                try:
+                    catalogResponses = await asyncio.gather(*catalogRequests)
+                except:
+                    catalogResponses = []
+                
+                
+                for response in catalogResponses:
+                    if response.status == 200: 
+                        hasCatalog = 1
+                        if hasCatalog: break        
+        isEcommerce = hasCart
 
         # Информация в таблицу domains
         self.db.makeDbRequest(f"""
@@ -189,9 +214,9 @@ class Parser:
 
         # Информация в таблицу domain_info
         self.db.makeDbRequest(f"""
-            INSERT INTO {self.domainInfoTableName} (domain_id, real_domain, title, description, keywords, city, inn, cms, hosting, is_www, is_ssl, is_https_redirect, ip, country, tag_id, is_ecommerce, license_type, last_updated) 
-            VALUE ({id}, '{realDomain}', '{title}', '{description}', '{keywords}', '{cities}', '{inn}', '{cms}', '{hosting}', '{www}', '{isSsl}', '{isHttpsRedirect}', '{ip}', '{country}', {tagId}, {isEcommerce}, '{licenseType}', '{lastUpdated}')
-            ON DUPLICATE KEY UPDATE real_domain='{realDomain}', title='{title}', description='{description}', keywords='{keywords}', city='{cities}', inn='{inn}', cms='{cms}', hosting='{hosting}', is_www='{www}', is_ssl='{isSsl}', is_https_redirect='{isHttpsRedirect}',  ip='{ip}', country='{country}', tag_id={tagId}, is_ecommerce={isEcommerce}, license_type='{licenseType}',  last_updated='{lastUpdated}'
+            INSERT INTO {self.domainInfoTableName} (domain_id, real_domain, title, description, keywords, city, inn, cms, hosting, is_www, is_ssl, is_https_redirect, ip, country, tag_id, is_ecommerce, has_catalog, license_type, last_updated) 
+            VALUE ({id}, '{realDomain}', '{title}', '{description}', '{keywords}', '{cities}', '{inn}', '{cms}', '{hosting}', '{www}', '{isSsl}', '{isHttpsRedirect}', '{ip}', '{country}', {tagId}, {isEcommerce}, '{hasCatalog}', '{licenseType}', '{lastUpdated}')
+            ON DUPLICATE KEY UPDATE real_domain='{realDomain}', title='{title}', description='{description}', keywords='{keywords}', city='{cities}', inn='{inn}', cms='{cms}', hosting='{hosting}', is_www='{www}', is_ssl='{isSsl}', is_https_redirect='{isHttpsRedirect}',  ip='{ip}', country='{country}', tag_id={tagId}, is_ecommerce={isEcommerce}, has_catalog={hasCatalog}, license_type='{licenseType}',  last_updated='{lastUpdated}'
         """)
 
         # Информация в таблицу domain_phones

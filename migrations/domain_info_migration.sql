@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS `domain_info` (
     `status` VARCHAR(30) DEFAULT 'Отсутствует',
     `comment` TEXT,
     `is_ecommerce` BOOLEAN,
+    `has_catalog` BOOLEAN,
     `license_type` VARCHAR(50),
     `bitrix_id` BIGINT UNSIGNED,
     `last_updated` DATE,
