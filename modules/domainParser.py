@@ -156,9 +156,9 @@ class Parser:
 
         # Информация в таблицу domain_info
         self.db.makeDbRequest(f"""
-            INSERT INTO {self.domainInfoTableName} (domain_id, title, description, keywords, city, inn, cms, hosting, is_www, is_ssl, is_https_redirect, ip, tag_id, is_ecommerce, license_type, last_updated) 
-            VALUE ({id}, '{title}', '{description}', '{keywords}', '{cities}', '{inn}', '{cms}', '{hosting}', '{www}', '{isSsl}', '{isHttpsRedirect}', '{ip}', {tagId}, {isEcommerce}, '{licenseType}', '{lastUpdated}')
-            ON DUPLICATE KEY UPDATE title='{title}', description='{description}', keywords='{keywords}', city='{cities}', inn='{inn}', cms='{cms}', hosting='{hosting}', is_www='{www}', is_ssl='{isSsl}', is_https_redirect='{isHttpsRedirect}',  ip='{ip}', tag_id={tagId}, is_ecommerce={isEcommerce}, license_type='{licenseType}',  last_updated='{lastUpdated}'
+            INSERT INTO {self.domainInfoTableName} (domain_id, real_domain, title, description, keywords, city, inn, cms, hosting, is_www, is_ssl, is_https_redirect, ip, tag_id, is_ecommerce, license_type, last_updated) 
+            VALUE ({id}, '{realDomain}', '{title}', '{description}', '{keywords}', '{cities}', '{inn}', '{cms}', '{hosting}', '{www}', '{isSsl}', '{isHttpsRedirect}', '{ip}', {tagId}, {isEcommerce}, '{licenseType}', '{lastUpdated}')
+            ON DUPLICATE KEY UPDATE real_domain='{realDomaiwn}', title='{title}', description='{description}', keywords='{keywords}', city='{cities}', inn='{inn}', cms='{cms}', hosting='{hosting}', is_www='{www}', is_ssl='{isSsl}', is_https_redirect='{isHttpsRedirect}',  ip='{ip}', tag_id={tagId}, is_ecommerce={isEcommerce}, license_type='{licenseType}',  last_updated='{lastUpdated}'
         """)
 
         # Информация в таблицу domain_phones

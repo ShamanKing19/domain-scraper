@@ -1,0 +1,1 @@
+SELECT real_domain, count(real_domain) as domain_count FROM domains GROUP BY real_domain ORDER BY (domain_count) DESC;

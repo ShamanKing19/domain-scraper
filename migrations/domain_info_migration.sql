@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS `domain_info` (
     `id` BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
     `domain_id` BIGINT UNSIGNED UNIQUE,
+    `real_domain` VARCHAR(255),
     `title` TEXT,
     `description` TEXT,
     `keywords` TEXT,
@@ -21,5 +22,6 @@ CREATE TABLE IF NOT EXISTS `domain_info` (
     `last_updated` DATE,
     `last_migrated_to_bitrix` DATE,
     FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`),
-    FOREIGN KEY (`tag_id`) REFERENCES `tags` (`id`)
+    FOREIGN KEY (`tag_id`) REFERENCES `tags` (`id`),
+    UNIQUE KEY (`real_domain`)
 );
