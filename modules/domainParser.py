@@ -1,5 +1,6 @@
 import datetime
 import http
+from pprint import pprint
 import warnings
 warnings.filterwarnings("ignore")
 import ssl
@@ -47,6 +48,8 @@ class Parser:
         self.httpsSession = aiohttp.ClientSession(connector=httpsConnector, timeout=sessionTimeout)
         self.httpSession = aiohttp.ClientSession(connector=httpConnector, timeout=sessionTimeout, trust_env=True)
 
+        # self.geoApi = "https://geolocation-db.com/jsonp/"
+        self.geoApi = "https://ipinfo.io/{ip}/json"
 
         # Получение списка доменов и создание таблиц
         # request_time = time.time()
@@ -82,6 +85,7 @@ class Parser:
     async def saveSiteInfo(self, id, domain, zone, response, isSsl, isHttpsRedirect, html):
         realDomain = str(response.real_url.human_repr())
         bs4 = BeautifulSoup(html, "lxml")
+        additionalRequests = []
 
         # s = time.time()
         title = await self.validator.findTitle(bs4)  
@@ -115,18 +119,27 @@ class Parser:
         www = 1 if "www." in realDomain else 0
         try:
             ip = socket.gethostbyname(response.host)
+            if ip:
+                additionalRequests.append(self.httpSession.get(self.geoApi.replace("{ip}", ip)))
+
         except:
             ip = ""
+
         try:
             hosting = whois.whois(realDomain)["registrar"]
         except:
             hosting = ""
 
+        # TODO: Вытаскивать хостинг отсюда вместо отдельной либы
+        additionalRequestResults = await asyncio.gather(*additionalRequests)
+        ipInfo = await additionalRequestResults[0].json()
+        country = ipInfo["country"]
+
         inn = ",".join(inns) if inns else ""
         cities = ",".join(cities) if cities else ""
         lastUpdated = datetime.date.today().strftime('%Y-%m-%d')
 
-        # TODO: Вынести отсюда как-нибудь
+        # TODO: Вынести отсюда как-нибудь или объединить с другими запросами
         # Проверка e-commerce сайтов
         isEcommerce = 0
         licenseType = ""
@@ -156,9 +169,9 @@ class Parser:
 
         # Информация в таблицу domain_info
         self.db.makeDbRequest(f"""
-            INSERT INTO {self.domainInfoTableName} (domain_id, real_domain, title, description, keywords, city, inn, cms, hosting, is_www, is_ssl, is_https_redirect, ip, tag_id, is_ecommerce, license_type, last_updated) 
-            VALUE ({id}, '{realDomain}', '{title}', '{description}', '{keywords}', '{cities}', '{inn}', '{cms}', '{hosting}', '{www}', '{isSsl}', '{isHttpsRedirect}', '{ip}', {tagId}, {isEcommerce}, '{licenseType}', '{lastUpdated}')
-            ON DUPLICATE KEY UPDATE real_domain='{realDomaiwn}', title='{title}', description='{description}', keywords='{keywords}', city='{cities}', inn='{inn}', cms='{cms}', hosting='{hosting}', is_www='{www}', is_ssl='{isSsl}', is_https_redirect='{isHttpsRedirect}',  ip='{ip}', tag_id={tagId}, is_ecommerce={isEcommerce}, license_type='{licenseType}',  last_updated='{lastUpdated}'
+            INSERT INTO {self.domainInfoTableName} (domain_id, real_domain, title, description, keywords, city, inn, cms, hosting, is_www, is_ssl, is_https_redirect, ip, country, tag_id, is_ecommerce, license_type, last_updated) 
+            VALUE ({id}, '{realDomain}', '{title}', '{description}', '{keywords}', '{cities}', '{inn}', '{cms}', '{hosting}', '{www}', '{isSsl}', '{isHttpsRedirect}', '{ip}', '{country}', {tagId}, {isEcommerce}, '{licenseType}', '{lastUpdated}')
+            ON DUPLICATE KEY UPDATE real_domain='{realDomain}', title='{title}', description='{description}', keywords='{keywords}', city='{cities}', inn='{inn}', cms='{cms}', hosting='{hosting}', is_www='{www}', is_ssl='{isSsl}', is_https_redirect='{isHttpsRedirect}',  ip='{ip}', country='{country}', tag_id={tagId}, is_ecommerce={isEcommerce}, license_type='{licenseType}',  last_updated='{lastUpdated}'
         """)
 
         # Информация в таблицу domain_phones

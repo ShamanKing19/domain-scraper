@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS `domain_info` (
     `is_www` BOOLEAN,
     `is_https_redirect` BOOLEAN,
     `ip` VARCHAR(20),
+    `country` VARCHAR(50),
     `tag_id` INT NULL,
     `status` VARCHAR(30) DEFAULT 'Отсутствует',
     `comment` TEXT,

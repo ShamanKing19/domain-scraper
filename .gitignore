@@ -136,9 +136,9 @@ archives
 __pycache__
 
 .vscode
-.txt
+*.txt
+*.json
 .gitignore
-.json
 test_files/
 company_info/
 data/
