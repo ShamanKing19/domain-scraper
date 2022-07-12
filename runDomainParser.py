@@ -81,7 +81,7 @@ def main():
                 process.join()
             processes.clear()
             print(f"С {offset-portion} по {offset} за {time.time() - portionStartTime} - Общее время парсинга: {time.time() - globalStartTime}")
-            putIn("stats.txt", f"С {offset-portion} по {offset+step} за {time.time() - portionStartTime} - Общее время парсинга: {time.time() - globalStartTime}")
+            putIn("stats.txt", f"С {offset-portion} по {offset} за {time.time() - portionStartTime} - Общее время парсинга: {time.time() - globalStartTime}")
 
     print(f"Парсинг c {startIndex} по {domainsCount} закончился за {time.time() - globalStartTime}")
 

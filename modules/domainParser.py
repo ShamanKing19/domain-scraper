@@ -112,32 +112,52 @@ class Parser:
         emails = await self.validator.findEmails(bs4)
         inns = await self.validator.findInn(bs4)
         cities = await self.validator.identifyCityByInn(inns) if inns else await self.validator.identifyCityByNumber(numbers)
-        # companyInfo = await self.validator.get_info_by_inn(inns, self.http_session)
+        
+        # Дополнительный поиск контактов
+        if not emails:
+            contactsSections = ["contacts", "contact", "about", "aboutus"]
+            contactsRequests = []
+            
+            for section in contactsSections:
+                contactsRequests.append(self.httpSession.get(realDomain.strip("/") + "/" + section))
+            try:
+                contactsResponses = await asyncio.gather(*contactsRequests)
+            except Exception as e:
+                contactsResponses = []
+            
+            for response in contactsResponses:
+                if response.status == 200: 
+                    contactBS4 = BeautifulSoup(await response.text())
+                    newEmails = await self.validator.findEmails(contactBS4)
+                    newNumbers = await self.validator.findPhoneNumbers(contactBS4)
+                    newInns = await self.validator.findInn(contactBS4)
+                    emails += newEmails
+                    numbers += newNumbers
+                    inns += newInns
+            emails = list(set(emails))
+            numbers = list(set(numbers))
 
         tagId = 0
-
+        inn = ",".join(inns) if inns else ""
+        cities = ",".join(cities) if cities else ""
+        lastUpdated = datetime.date.today().strftime('%Y-%m-%d')
         www = 1 if "www." in realDomain else 0
+
         try:
             ip = socket.gethostbyname(response.host)
             if ip:
-                additionalRequests.append(self.httpSession.get(self.geoApi.replace("{ip}", ip)))
-
+                ipInfoResponse = await self.httpSession.get(self.geoApi.replace("{ip}", ip))
+                ipInfo = await ipInfoResponse.json()
+                country = ipInfo["country"]
         except:
             ip = ""
+            country = ""
 
         try:
             hosting = whois.whois(realDomain)["registrar"]
         except:
             hosting = ""
-
-        # TODO: Вытаскивать хостинг отсюда вместо отдельной либы
-        additionalRequestResults = await asyncio.gather(*additionalRequests)
-        ipInfo = await additionalRequestResults[0].json()
-        country = ipInfo["country"]
-
-        inn = ",".join(inns) if inns else ""
-        cities = ",".join(cities) if cities else ""
-        lastUpdated = datetime.date.today().strftime('%Y-%m-%d')
+        
 
         # TODO: Вынести отсюда как-нибудь или объединить с другими запросами
         # Проверка e-commerce сайтов
