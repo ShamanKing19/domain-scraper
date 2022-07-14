@@ -89,7 +89,12 @@ class Parser:
         
 
     async def saveSiteInfo(self, id, domain, zone, response, isSsl, isHttpsRedirect, html):
-        realDomain = str(response.real_url.human_repr())
+        try:
+            realDomain = str(response.real_url.human_repr())
+        except Exception as e:
+            realDomain = "error"
+            self.log("logs/realDomainErrorLogs.txt", f"url: {domain}, error: {e}")
+
         bs4 = BeautifulSoup(html, "lxml")
 
         title = await self.validator.findTitle(bs4)  
@@ -209,7 +214,6 @@ class Parser:
                 except:
                     catalogResponses = []
                 
-                
                 for response in catalogResponses:
                     if response.status == 200: 
                         hasCatalog = 1
@@ -284,24 +288,25 @@ class Parser:
             httpsResponse = results[1]
 
             # https redirect check
-            if not httpResponse: return
             isHttpsRedirect = 1 if "https://" in httpResponse.real_url.human_repr() else 0
             isSsl = isHttpsRedirect
 
             # no https redirect check but with ssl
-            if httpsResponse: isSsl = 1 if "https://" in httpsResponse.real_url.human_repr() else 0
+            if httpsResponse: 
+                isSsl = 1 if "https://" in httpsResponse.real_url.human_repr() else 0
 
             if httpResponse.status == 200:
                 html = await httpResponse.text()
                 await self.saveSiteInfo(id, domain, zone, httpResponse, isSsl, isHttpsRedirect, html)
 
-            #! Не меняю статус если сайт хоть раз отдавал 200
+            #* Не меняю статус если сайт хоть раз отдавал 200
             elif previousStatus == 200:
                 pass
 
             elif httpResponse.status:
                 newStatus = httpResponse.status
 
+        #! Обработка ошибок http и https запросов
         except (
             aiohttp.client_exceptions.ClientConnectorError,
             aiohttp.client_exceptions.ClientOSError,
@@ -319,26 +324,24 @@ class Parser:
         except aiohttp.client_exceptions.ServerTimeoutError as error:
             newStatus = 408
 
+        # TODO: Придумать как обойти это
+        # Сайт либо заблокироан, либо без ssl сертификата
         except aiohttp.client_exceptions.ServerDisconnectedError as error:
-            # TODO: Придумать как обойти это
-            # Сайт либо заблокироан, либо без ssl сертификата
-            pass
+            newStatus = 800
+            self.log("logs/aiohttp.client_exceptions.ServerDisconnectedError.txt", f"{domain} - {error}")
         
-        # status = 888
         except (UnicodeDecodeError, UnicodeEncodeError,) as error:
             newStatus = 888
         
         #! Для работы на сервере
         except (ssl.CertificateError, ssl.SSLError, http.cookies.CookieError):
-            pass
+            self.log("logs/ssl.SSLError", f"{domain} - {error}")
   
         except (pymysql.err.DataError, ValueError) as error:
-            print(f"pymysql.err.DataError, ValueError: {error}")
-            # pass
+            self.log("logs/pymysql.err.DataError", f"{domain} - {error}")
         
         except pymysql.Error as error:
             print(f"pymysql.Error: {error}")
-
 
         finally:
             if previousStatus != 200:
@@ -347,6 +350,7 @@ class Parser:
                     SET status = {newStatus}
                     WHERE id = {id}
                 """)
+        
         
     async def parseAllDomains(self):
         requests = []
@@ -424,6 +428,7 @@ class Parser:
             "User-agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0"
         }
         return userAgents
+
 
     def log(self, filename, content):
         file = open(filename, "a", encoding="utf-8")

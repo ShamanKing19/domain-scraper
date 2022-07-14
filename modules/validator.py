@@ -294,7 +294,6 @@ class Validator():
 
 
     #* id для дебага
-    # TODO: проверять ещё по url
     async def checkInvalidStatus(self, bs4, title, description, id, url):
         info = {
             "status": False,
@@ -480,9 +479,9 @@ class Validator():
             'UCOZ-JS': "Ucoz",
             '<script src="https://static.tilda': 'Tilda',
             '<meta name="generator" content="Wix': 'Wix',
-            'href="https://nethouse.ru/?p': 'Nethouse', # TODO: Проверить
+            'href="https://nethouse.ru/?p': 'Nethouse',
             'data-muse-uid': 'Adobe Muse',
-            'img src="/images/cms/': 'UMI', # TODO: Проверить
+            'img src="/images/cms/': 'UMI',
             '-= Amiro.CMS (c) =-': 'Amiro',
             'content="CMS EDGESTILE SiteEdit">': 'SiteEdit',
             'meta name="generator" content="OkayCMS': 'Okay'
@@ -496,16 +495,16 @@ class Validator():
     async def findKeywords(self, bs4):
         keywords = bs4.find("meta", {"name": "keywords"})
         if not keywords or "content" not in keywords.attrs.keys(): return ""
-        return keywords["content"].replace("\n", "").replace('"', "").replace("'", "").strip()
+        return keywords["content"].replace("\n", "").replace('"', "").replace("'", "").replace("\\", "").strip()[:1000]
 
 
     async def findDescription(self, bs4):
         description = bs4.find("meta", {"name": "description"})
         if not description or "content" not in description.attrs.keys(): return ""
-        return description["content"].replace("\n", "").replace('"', "").replace("'", "").strip()
+        return description["content"].replace("\n", "").replace('"', "").replace("'", "").replace("\\", "").strip()
         
 
     async def findTitle(self, bs4):
         title = bs4.find("title")
         if not title: return "" 
-        return title.get_text().replace("\n", "").replace('"', "").replace("'", "").strip()
+        return title.get_text().replace("\n", "").replace('"', "").replace("'", "").replace("\\", "").strip()

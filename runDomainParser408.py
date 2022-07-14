@@ -40,12 +40,12 @@ def main():
     argParser.add_argument("--portion")
     args = argParser.parse_args()
 
-    domainsCount = DbConnector().makeSingleDbRequest(
-        "SELECT count(*) FROM domains")["count(*)"]
+    domainsCount = DbConnector().makeSingleDbRequest("SELECT count(*) FROM domains")["count(*)"]
     firstId = DbConnector().makeSingleDbRequest("SELECT id FROM domains ORDER BY id ASC LIMIT 1")["id"]
     lastId = DbConnector().makeSingleDbRequest("SELECT id FROM domains ORDER BY id DESC LIMIT 1")["id"]
 
     # * Начальный индекс для парсинга
+    #! На шаге 266049 - 275258 он ломается
     offset = 0
     if args.offset:
         offset = int(args.offset)
