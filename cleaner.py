@@ -36,15 +36,14 @@ class Cleaner:
             if not validateResult["status"]: 
                 continue
             
-            res = self.db.makeDbRequest(f"""
+            self.db.makeDbRequest(f"""
                 DELETE FROM domain_info
                 WHERE id={id}
             """)
+
             deletedRows += 1
-            # print(id, validateResult["banword"], realDomain)
             log("logs/deletedRows.txt", f"id: {id}, domain_id: {domainId}, real_domain: {realDomain}, title: {title[:100]}, description: {description[:100]}")
-            print(res)
-        print(f"Удалено {deletedRows} записей -_-")
+        print(f"Удалено {deletedRows} записей")
 
 
 
@@ -70,7 +69,7 @@ if __name__ == "__main__":
     lastId = DbConnector().makeSingleDbRequest("SELECT id FROM domain_info ORDER BY id DESC LIMIT 1")["id"]
 
     offset = 0
-    portion = 1000
+    portion = 10000
     coresNumber = 1
 
     startIndex = firstId + offset

@@ -101,7 +101,7 @@ class Parser:
         if invalidStatus:
             if cms == "Bitrix":
                 invalidStatus = 228
-                self.log("bitrixInvalid.txt", f"{realDomain} - {invalidStatus} - {banword}\n")
+                self.log("bitrixInvalid.txt", f"{realDomain} - {invalidStatus} - {banword}")
             self.db.makeDbRequest(f"""
                 INSERT INTO {self.statusesTableName} (id, domain, zone, real_domain, status) 
                 VALUE ('{id}', '{domain}', '{zone}', '{realDomain}', {invalidStatus})
@@ -162,7 +162,7 @@ class Parser:
                 # ipInfoJson = json.loads(ipInfoFormatted)
                 # country = ipInfoJson.get("country_code", "")
         except Exception as e:
-            print(e)
+            print(f"Общая ошибка (Exception): {e}")
             
 
         try:
@@ -333,11 +333,11 @@ class Parser:
             pass
   
         except (pymysql.err.DataError, ValueError) as error:
-            print(error)
+            print(f"pymysql.err.DataError, ValueError: {error}")
             # pass
         
         except pymysql.Error as error:
-            print(error)
+            print(f"pymysql.Error: {error}")
 
 
         finally:
@@ -352,7 +352,6 @@ class Parser:
         requests = []
         startTime = time.time()
 
-        # print(f"\n---------------------------------- Начал обработку запросов ----------------------------------\n")
         for domain in self.domains:
             domainBaseInfo = {
                 "domain": domain["domain"],
@@ -368,7 +367,6 @@ class Parser:
         await self.httpSession.close()
         await self.httpsSession.close()
         requests.clear()
-        # print(f"-------- Обработка {self.domains_count} запросов заняла  {time.time() - start_time} секунд --------")
 
 
     def downloadRuDomainsFileIfNotExists(self):
