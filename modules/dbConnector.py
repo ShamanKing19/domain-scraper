@@ -31,6 +31,7 @@ class DbConnector:
             # TODO: Обрабатывать только ошибки подключения
             except pymysql.Error as e:
                 print(f"Connection error: {e} - {datetime.now()}")
+                self.log("logs/connectionLogs.txt", f"{e}\n{e.with_traceback()}")
                 time.sleep(5)
 
 
@@ -46,6 +47,7 @@ class DbConnector:
                 return result
             except (pymysql.err.OperationalError) as e:
                 print(f"Request error: {e} - {datetime.now()}")
+                self.log("logs/requestLogs.txt", f"{e}\n{e.with_traceback()}")
                 time.sleep(5)
 
 
@@ -61,4 +63,10 @@ class DbConnector:
                 return result
             except (pymysql.err.OperationalError) as e:
                 print(f"Single request error: {e} - {datetime.now()}")
+                self.log("logs/singleRequestLogs.txt", f"{e}\n{e.with_traceback()}")
                 time.sleep(5)
+
+    def log(self, filename, content):
+        file = open(filename, "a", encoding="utf-8")
+        file.write(content + "\n")
+        file.close()

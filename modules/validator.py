@@ -35,7 +35,7 @@ class Validator():
 
 
     # TODO: Переставить слова местами для оптимизации
-    def getStatusBanwords(self):
+    def getStatusBanwords(self):        
         # Ключевые слова для заголовка
         statusBanwordsTitle = [
             {
@@ -70,7 +70,7 @@ class Validator():
                 "status": 1200,
                 "keywords" : [
                     "порно", "porn", "sex", "секс", "проститутки", "шлюхи", "brazzers",
-                    "хентай", "бдсм", "геи", "увеличить член",
+                    "хентай", "бдсм", "геи", "увеличить член", "порнуха", "порнуху"
                 ]
             },
             {
@@ -138,7 +138,7 @@ class Validator():
                 "status": 2200,
                 "keywords" : [
                     "порно", "porn", "sex", "секс", "проститутки", "шлюхи", "brazzers",
-                    "хентай", "бдсм", "геи", "увеличить член",
+                    "хентай", "бдсм", "геи", "увеличить член", "порнуха", "порнуху"
                 ]
             },
             {
@@ -226,6 +226,7 @@ class Validator():
         ]
 
         banwords = {
+            "url": [],
             "title": statusBanwordsTitle,
             "description": statusBanwordsDescription,
             "content": statusBanwordsContent,
@@ -235,7 +236,7 @@ class Validator():
 
     def getCompiledStatusBanwords(self):
         statusBanwords = self.getStatusBanwords()
-        
+
         additionalTitleRegularExpressions = [
             {
                 "name": "Bets + fishing",
@@ -249,7 +250,33 @@ class Validator():
             },
         ]
 
+        # Ключевые слова для ссылки
+        additionalUrlRegularExpressions = [
+            {
+                "name": "Hosting",
+                "status": 4100,
+                "keywords": [
+
+                ]
+            },
+            {
+                "name": "Porn",
+                "status": 4200,
+                "keywords": [
+                    r"porn",
+                ]
+            },
+            {
+                "name": "Bets + fishing",
+                "status": 4300,
+                "keywords": [
+                    r"1xbet",
+                ]
+            },
+        ]
+
         compiledStatusBanwords = {
+            "url": [*additionalUrlRegularExpressions],
             "title": [*additionalTitleRegularExpressions],
             "description": [],
             "content": [],
@@ -275,6 +302,7 @@ class Validator():
         }
         
         searchParts = {
+            "url": url,
             "title": title,
             "description": description,
             "content": bs4.text,
