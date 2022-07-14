@@ -4,7 +4,6 @@ from pprint import pprint
 import re
 import time
 import warnings
-import aiohttp
 from dotenv import load_dotenv
 import phonenumbers
 from phonenumbers import geocoder
@@ -19,11 +18,12 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 class Validator():
-    def __init__(self, categories, regions):
-        self.categories = self.getCategoriesWithStrippedTags(categories) 
-        self.compiledTagsCategories = self.getCompiledTags(copy.deepcopy(categories))
-        self.compiledStatusBanwords = self.getCompiledStatusBanwords()
+    def __init__(self, regions):
+    # def __init__(self, categories, regions):
+        # self.categories = self.getCategoriesWithStrippedTags(categories) 
+        # self.compiledTagsCategories = self.getCompiledTags(copy.deepcopy(categories))
         self.regions = regions
+        self.compiledStatusBanwords = self.getCompiledStatusBanwords()
                 
        # TODO: Довести до идеала регулярки
         self.reNumbersTemplate = re.compile(r"\+?[78]{1}[\s\(-]{0,2}[0-9]{3,4}[\s\)]?[\s-]?[0-9-\s]{0,4}[0-9-\s]{0,5}")
@@ -238,14 +238,14 @@ class Validator():
         
         additionalTitleRegularExpressions = [
             {
-                    "name": "Bets + fishing",
-                    "status": 1300,
-                    "keywords": [r"1xbet"]
+                "name": "Bets + fishing",
+                "status": 1300,
+                "keywords": [r"1xbet"]
             },
             {
-                    "name": "Domains shop",
-                    "status": 1700,
-                    "keywords": [r"\b[Дд]омен\b[a-zA-Zа-яА-Я0-9\.\-\s]*\bпрода[её]тся\b"]
+                "name": "Domains shop",
+                "status": 1700,
+                "keywords": [r"\b[Дд]омен\b[a-zA-Zа-яА-Я0-9\.\-\s]*\bпрода[её]тся\b"]
             },
         ]
 
@@ -266,7 +266,14 @@ class Validator():
         return compiledStatusBanwords
 
 
+    #* id для дебага
+    # TODO: проверять ещё по url
     async def checkInvalidStatus(self, bs4, title, description, id, url):
+        info = {
+            "status": False,
+            "banword": False
+        }
+        
         searchParts = {
             "title": title,
             "description": description,
@@ -278,8 +285,10 @@ class Validator():
                 for banword in category["keywords"]:
                     if re.search(banword, searchParts[part].lower()):
                         # print(id, category["name"], category["status"], banword, url, sep=" - ")
-                        return [category["status"], banword]
-        return [False]
+                        info["status"] = category["status"]
+                        info["banword"] = banword
+                        return info
+        return info
 
 
     def getCategoriesWithStrippedTags(self, categories):

@@ -24,7 +24,7 @@ import pymysql
 
 from modules.dbConnector import DbConnector
 from modules.validator import Validator
-from scripts.tableCreator import TableCreator
+from modules.tableCreator import TableCreator
 
 
 class Parser:
@@ -75,11 +75,12 @@ class Parser:
             RIGHT JOIN subcategory ON category.id = subcategory.category_id
             INNER JOIN tags ON subcategory.id = tags.id
         """)
+        
         # Регионы
-        self.regions = self.db.makeDbRequest("""
-            SELECT * FROM regions
-        """)
-        self.validator = Validator(self.categories, self.regions)
+        self.regions = self.db.makeDbRequest("SELECT * FROM regions")
+
+        self.validator = Validator(self.regions)
+        # self.validator = Validator(self.categories, self.regions)
 
 
     def run(self):
@@ -94,8 +95,8 @@ class Parser:
         title = await self.validator.findTitle(bs4)  
         description = await self.validator.findDescription(bs4)
         invalidResult =  await self.validator.checkInvalidStatus(bs4, title, description, id, realDomain)
-        invalidStatus = invalidResult[0]
-        banword = "" if len(invalidResult) == 1 else invalidResult[1]
+        invalidStatus = invalidResult["status"]
+        banword = "" if not invalidResult["banword"] else invalidResult["banword"]
         cms = await self.validator.identifyCms(html)
         if invalidStatus:
             if cms == "Bitrix":
