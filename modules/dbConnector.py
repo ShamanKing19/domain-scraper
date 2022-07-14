@@ -44,7 +44,7 @@ class DbConnector:
                 self.connection.commit()
                 isStable = True
                 return result
-            except (pymysql.err.ProgrammingError, pymysql.err.OperationalError) as e:
+            except (pymysql.err.OperationalError) as e:
                 print(f"Request error: {e} - {datetime.now()}")
                 time.sleep(5)
 
@@ -59,6 +59,6 @@ class DbConnector:
                     result = cursor.fetchone()
                     isStable = True
                 return result
-            except (pymysql.err.ProgrammingError, pymysql.err.OperationalError) as e:
+            except (pymysql.err.OperationalError) as e:
                 print(f"Single request error: {e} - {datetime.now()}")
                 time.sleep(5)

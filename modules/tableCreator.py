@@ -1,12 +1,9 @@
-import os
-import time
-import pymysql
-
 try:
-    from dbConnector import DbConnector
+    from dbConnector import DbConnector 
 except:
-    from scripts.dbConnector import DbConnector
+    from modules.dbConnector import DbConnector
 
+    
 class TableCreator:
     def __init__(self):
         self.db = DbConnector()

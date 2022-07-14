@@ -1,4 +1,4 @@
-CREATE TABLE `company_founders`(  
+CREATE TABLE IF NOT EXISTS `company_founders`(  
     `id` BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
     `inn` VARCHAR(20),
     `founder_full_name` VARCHAR(255),

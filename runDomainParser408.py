@@ -88,7 +88,7 @@ def main():
             processes.clear()
             infoString = f"С {startId - (step*(coresNumber-1))} по {offset} за {time.time() - portionStartTime} - Общее время парсинга: {time.time() - globalStartTime}  - {datetime.now()}"
             print(infoString)
-            log("stats408.txt", infoString)
+            log("logs/stats408.txt", infoString)
             
     print(f"Парсинг c {startIndex} по {domainsCount} закончился за {time.time() - globalStartTime}")
 
