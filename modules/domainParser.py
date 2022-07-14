@@ -334,9 +334,12 @@ class Parser:
         except (ssl.CertificateError, ssl.SSLError, http.cookies.CookieError):
             pass
   
-        except (pymysql.err.ProgrammingError, pymysql.err.DataError, ValueError) as error:
-            # print(error)
-            pass
+        except (pymysql.err.DataError, ValueError) as error:
+            print(error)
+            # pass
+        
+        except pymysql.Error as error:
+            print(error)
 
 
         finally:

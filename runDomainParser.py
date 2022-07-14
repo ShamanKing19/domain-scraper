@@ -1,4 +1,5 @@
 import argparse
+from datetime import datetime
 from multiprocessing import Process
 import os
 from pprint import pprint
@@ -82,7 +83,7 @@ def main():
             for process in processes:
                 process.join()
             processes.clear()
-            infoString = f"С {startId - (step*(coresNumber-1))} по {offset} за {time.time() - portionStartTime} - Общее время парсинга: {time.time() - globalStartTime}"
+            infoString = f"С {startId - (step*(coresNumber-1))} по {offset} за {time.time() - portionStartTime} - Общее время парсинга: {time.time() - globalStartTime} - {datetime.now()}"
             print(infoString)
             putIn("stats.txt", infoString)
 
