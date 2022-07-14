@@ -387,21 +387,20 @@ class Validator():
 
 
     async def findEmails(self, bs4):
-        # Поиск по тексту
+        # Поиск почт
         rawEmails = re.findall(self.reEmailsTemplate, bs4.text)
         validEmails = []
 
         links = [a for a in bs4.findAll("a", {"href": True}) if "mailto:" in a.get("href")]
         for a in links:
-            if a.text:
-                rawEmails.append(a.text)
-            else:
-                rawEmails.append(a.get("href").split(":")[-1])
+            rawEmails.append(a.get("href").split(":")[-1])
 
+        # Валидация почт
         for email in rawEmails:
-            matchedEmail = re.match(self.reEmailsTemplate, email)
+            matchedEmail = re.findall(self.reEmailsTemplate, email)
+
             if matchedEmail:
-                validEmail = matchedEmail.string
+                validEmail = matchedEmail[0]
                 validEmails.append(validEmail.strip("\"\'.,"))
         return list(set(validEmails))
 

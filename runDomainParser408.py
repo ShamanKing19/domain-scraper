@@ -1,4 +1,5 @@
 import argparse
+from datetime import datetime
 from multiprocessing import Process
 import os
 from pprint import pprint
@@ -8,6 +9,12 @@ from dotenv import load_dotenv
 
 from modules.dbConnector import DbConnector
 from modules.domainParser import Parser
+
+
+def log(filename, content):
+    file = open(filename, "a", encoding="utf-8")
+    file.write(content + "\n")
+    file.close()
 
 
 def loadDotEnv():
@@ -79,8 +86,9 @@ def main():
             for process in processes:
                 process.join()
             processes.clear()
-            infoString = f"С {startId - (step*(coresNumber-1))} по {offset} за {time.time() - portionStartTime} - Общее время парсинга: {time.time() - globalStartTime}"
+            infoString = f"С {startId - (step*(coresNumber-1))} по {offset} за {time.time() - portionStartTime} - Общее время парсинга: {time.time() - globalStartTime}  - {datetime.now()}"
             print(infoString)
+            log("stats408.txt", infoString)
             
     print(f"Парсинг c {startIndex} по {domainsCount} закончился за {time.time() - globalStartTime}")
 

@@ -25,6 +25,8 @@ def loadDotEnv():
 
 def runParser(portion, offset, domains):
     parser = Parser(domains)
+    parser.connectionTimeout = 30
+    parser.readTimeout = 60
     parser.run()
 
 
@@ -38,7 +40,8 @@ def main():
     argParser.add_argument("--portion")
     args = argParser.parse_args()
 
-    domainsCount = DbConnector().makeSingleDbRequest("SELECT count(*) FROM domains")["count(*)"]
+    domainsCount = DbConnector().makeSingleDbRequest(
+        "SELECT count(*) FROM domains")["count(*)"]
     firstId = DbConnector().makeSingleDbRequest("SELECT id FROM domains ORDER BY id ASC LIMIT 1")["id"]
     lastId = DbConnector().makeSingleDbRequest("SELECT id FROM domains ORDER BY id DESC LIMIT 1")["id"]
 
@@ -47,7 +50,7 @@ def main():
     if args.offset:
         offset = int(args.offset)
     # * Количество процессов парсера
-    coresNumber = 4
+    coresNumber = 1
     if args.cores:
         coresNumber = int(args.cores)
     # * Одновременно обрабатываемая порция
@@ -68,12 +71,12 @@ def main():
         coresNumber = 1
 
     while offset < lastId:
-        # Только для вывода
-        startId = offset
+        # Только для инфы
         portionStartTime = time.time()
+        startId = offset
 
         # Парсинг всех сайтов
-        domains = DbConnector().makeDbRequest(f"SELECT * FROM domains WHERE id > {offset} LIMIT {step}")
+        domains = DbConnector().makeDbRequest(f"SELECT * FROM domains WHERE id >= {offset} AND status=404 LIMIT {step}")
         offset = domains[-1]["id"]
 
         process = Process(target=runParser, args=(step, offset, domains))
@@ -83,10 +86,11 @@ def main():
             for process in processes:
                 process.join()
             processes.clear()
-            infoString = f"С {startId - (step*(coresNumber-1))} по {offset} за {time.time() - portionStartTime} - Общее время парсинга: {time.time() - globalStartTime} - {datetime.now()}"
+            infoString = f"С {startId - (step*(coresNumber-1))} по {offset} за {time.time() - portionStartTime} - Общее время парсинга: {time.time() - globalStartTime}  - {datetime.now()}"
             print(infoString)
-            log("stats.txt", infoString)
+            log("stats404.txt", infoString)
 
+            
     print(f"Парсинг c {startIndex} по {domainsCount} закончился за {time.time() - globalStartTime}")
 
 

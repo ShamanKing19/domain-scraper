@@ -3,6 +3,7 @@ import http
 import json
 from pprint import pprint
 import warnings
+
 warnings.filterwarnings("ignore")
 import ssl
 ssl.match_hostname = lambda cert, hostname: True
@@ -70,14 +71,14 @@ class Parser:
         ### Подготовленные данные для парсинга
         # Категории
         self.categories = self.db.makeDbRequest("""
-                    SELECT category.name, subcategory.name, tags.tag, tags.id FROM category
-                    RIGHT JOIN subcategory ON category.id = subcategory.category_id
-                    INNER JOIN tags ON subcategory.id = tags.id
-                """)
+            SELECT category.name, subcategory.name, tags.tag, tags.id FROM category
+            RIGHT JOIN subcategory ON category.id = subcategory.category_id
+            INNER JOIN tags ON subcategory.id = tags.id
+        """)
         # Регионы
         self.regions = self.db.makeDbRequest("""
-                    SELECT * FROM regions
-                """)
+            SELECT * FROM regions
+        """)
         self.validator = Validator(self.categories, self.regions)
 
 
@@ -89,9 +90,7 @@ class Parser:
     async def saveSiteInfo(self, id, domain, zone, response, isSsl, isHttpsRedirect, html):
         realDomain = str(response.real_url.human_repr())
         bs4 = BeautifulSoup(html, "lxml")
-        additionalRequests = []
 
-        # s = time.time()
         title = await self.validator.findTitle(bs4)  
         description = await self.validator.findDescription(bs4)
         invalidResult =  await self.validator.checkInvalidStatus(bs4, title, description, id, realDomain)
@@ -101,9 +100,7 @@ class Parser:
         if invalidStatus:
             if cms == "Bitrix":
                 invalidStatus = 228
-                file = open("bitrixInvalid.txt", "a", encoding="utf-8")
-                file.write(f"{realDomain} - {invalidStatus} - {banword}\n")
-                file.close()
+                self.log("bitrixInvalid.txt", f"{realDomain} - {invalidStatus} - {banword}\n")
             self.db.makeDbRequest(f"""
                 INSERT INTO {self.statusesTableName} (id, domain, zone, real_domain, status) 
                 VALUE ('{id}', '{domain}', '{zone}', '{realDomain}', {invalidStatus})
@@ -415,6 +412,7 @@ class Parser:
         print(f"Файл прочитан за {time.time() - startTime}")
         return domains
 
+
     def getHeaders(self):
         userAgents = {
             "User-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
@@ -427,3 +425,8 @@ class Parser:
             "User-agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0"
         }
         return userAgents
+
+    def log(self, filename, content):
+        file = open(filename, "a", encoding="utf-8")
+        file.write(content + "\n")
+        file.close()
