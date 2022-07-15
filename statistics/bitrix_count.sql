@@ -1,1 +1,0 @@
-SELECT COUNT(*) FROM domain_info WHERE cms="Bitrix";

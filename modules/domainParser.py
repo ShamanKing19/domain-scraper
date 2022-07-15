@@ -344,7 +344,7 @@ class Parser:
             print(f"pymysql.Error: {error}")
 
         finally:
-            if previousStatus != 200:
+            if previousStatus != 200 and newStatus != 200:
                 self.db.makeDbRequest(f"""
                     UPDATE {self.statusesTableName}
                     SET status = {newStatus}

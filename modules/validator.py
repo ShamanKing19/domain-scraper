@@ -241,12 +241,33 @@ class Validator():
             {
                 "name": "Bets + fishing",
                 "status": 1300,
-                "keywords": [r"1xbet"]
+                "keywords": [r"1[\s]*[xх][\s]*[Bb][eе]t"]
             },
             {
                 "name": "Domains shop",
                 "status": 1700,
-                "keywords": [r"\b[Дд]омен\b[a-zA-Zа-яА-Я0-9\.\-\s]*\bпрода[её]тся\b"]
+                "keywords": [
+                    r"\b[Дд]омен\b[a-zA-Zа-яА-Я0-9\.\-\s]*\bпрода[её]тся\b",
+                    r"\b[Дд]омен\b[a-zA-Zа-яА-Я0-9\.\-:\s]*\bкупить\b",
+                ]
+            },
+        ]
+
+        additionalDescriptionRegularExpressions = [
+            {
+                "name": "Hosting",
+                "status": 2100,
+                "keywords": []
+            },
+        ]
+
+        additionalContentRegularExpressions = [
+            {
+                "name": "Hosting",
+                "status": 3100,
+                "keywords": [
+                    r"Сайт[a-zA-Zа-яА-Я0-9\.\-:\s]*только что создан"
+                ]
             },
         ]
 
@@ -278,8 +299,8 @@ class Validator():
         compiledStatusBanwords = {
             "url": [*additionalUrlRegularExpressions],
             "title": [*additionalTitleRegularExpressions],
-            "description": [],
-            "content": [],
+            "description": [*additionalDescriptionRegularExpressions],
+            "content": [*additionalContentRegularExpressions],
         }
         
         for part in compiledStatusBanwords.keys():
