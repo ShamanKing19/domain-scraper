@@ -1,9 +1,6 @@
-
-
 import csv
 
 from tqdm import tqdm
-
 from modules.dbConnector import DbConnector
 
 
@@ -28,6 +25,7 @@ class CSVLoader:
                 VALUE ('{domain}', '{zone}')
                 ON DUPLICATE KEY UPDATE id=id
             """)
+        print(f"Всё. Добавил {len(self.domains)} записей")
 
     
     def getDataFromFile(self):

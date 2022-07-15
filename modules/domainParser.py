@@ -280,7 +280,7 @@ class Parser:
         domain = domainBaseInfo["domain"]
         zone = domainBaseInfo.get("zone", "ru")
         previousStatus = domainBaseInfo["previousStatus"]
-        newStatus = 0
+        newStatus = 200
 
         try:
             results = await asyncio.gather(self.httpRequest(domainBaseInfo["domain"]), self.httpsRequest(domainBaseInfo["domain"]), return_exceptions=False)
@@ -328,14 +328,14 @@ class Parser:
         # Сайт либо заблокироан, либо без ssl сертификата
         except aiohttp.client_exceptions.ServerDisconnectedError as error:
             newStatus = 800
-            self.log("logs/aiohttp.client_exceptions.ServerDisconnectedError.txt", f"{domain} - {error}")
+            self.log("logs/ServerDisconnectedError.txt", f"{domain} - {error}")
         
         except (UnicodeDecodeError, UnicodeEncodeError,) as error:
             newStatus = 888
         
         #! Для работы на сервере
         except (ssl.CertificateError, ssl.SSLError, http.cookies.CookieError):
-            self.log("logs/ssl.SSLError", f"{domain} - {error}")
+            self.log("logs/SSLError", f"{domain} - {error}")
   
         except (pymysql.err.DataError, ValueError) as error:
             self.log("logs/pymysql.err.DataError", f"{domain} - {error}")
