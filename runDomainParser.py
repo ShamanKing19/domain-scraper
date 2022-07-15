@@ -69,12 +69,17 @@ def main():
 
     while offset < lastId:
         # Только для вывода
-        startId = offset
+        startID = offset
         portionStartTime = time.time()
 
         # Парсинг всех сайтов
-        domains = DbConnector().makeDbRequest(f"SELECT * FROM domains WHERE id > {offset} LIMIT {step}")
-        offset = domains[-1]["id"]
+        try:
+            domains = DbConnector().makeDbRequest(f"SELECT * FROM domains WHERE id > {offset} LIMIT {step}")
+            offset = domains[-1]["id"]
+        except Exception as e:
+            domains = []
+            offset = startID
+            log("requestError.txt", e)
 
         process = Process(target=runParser, args=(step, offset, domains))
         process.start()
@@ -83,7 +88,7 @@ def main():
             for process in processes:
                 process.join()
             processes.clear()
-            infoString = f"С {startId - (step*(coresNumber-1))} по {offset} за {time.time() - portionStartTime} - Общее время парсинга: {time.time() - globalStartTime} - {datetime.now()}"
+            infoString = f"С {startID - (step*(coresNumber-1))} по {offset} за {time.time() - portionStartTime} - Общее время парсинга: {time.time() - globalStartTime} - {datetime.now()}"
             print(infoString)
             log("logs/stats.txt", infoString)
 
