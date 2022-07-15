@@ -70,14 +70,10 @@ class Parser:
 
         ### Подготовленные данные для парсинга
         # Категории
-        self.categories = self.db.makeDbRequest("""
-            SELECT category.name, subcategory.name, tags.tag, tags.id FROM category
-            RIGHT JOIN subcategory ON category.id = subcategory.category_id
-            INNER JOIN tags ON subcategory.id = tags.id
-        """)
+        self.categories = self.db.getCategories()
         
         # Регионы
-        self.regions = self.db.makeDbRequest("SELECT * FROM regions")
+        self.regions = self.db.getRegions()
 
         self.validator = Validator(self.regions)
         # self.validator = Validator(self.categories, self.regions)
@@ -107,11 +103,7 @@ class Parser:
             if cms == "Bitrix":
                 invalidStatus = 228
                 self.log("logs/invalidBitrix.txt", f"{realDomain} - {invalidStatus} - {banword}")
-            self.db.makeDbRequest(f"""
-                INSERT INTO {self.statusesTableName} (id, domain, zone, real_domain, status) 
-                VALUE ('{id}', '{domain}', '{zone}', '{realDomain}', {invalidStatus})
-                ON DUPLICATE KEY UPDATE real_domain='{realDomain}', status={invalidStatus}
-            """)
+            self.db.insertIntoDomains(id=id, domain=domain, zone=zone, realDomain=realDomain, status=invalidStatus)
             return
         
         keywords = await self.validator.findKeywords(bs4)
@@ -221,42 +213,47 @@ class Parser:
         isEcommerce = hasCart
 
         # Информация в таблицу domains
-        self.db.makeDbRequest(f"""
-            INSERT INTO {self.statusesTableName} (id, domain, zone, real_domain, status) 
-            VALUE ('{id}', '{domain}', '{zone}', '{realDomain}', {200})
-            ON DUPLICATE KEY UPDATE real_domain='{realDomain}', status=200
-        """)
+        self.db.insertIntoDomains(id=id,
+            domain=domain,
+            zone=zone,
+            realDomain=realDomain,
+            status=200
+        )
 
         # Информация в таблицу domain_info
-        self.db.makeDbRequest(f"""
-            INSERT INTO {self.domainInfoTableName} (domain_id, real_domain, title, description, keywords, city, inn, cms, hosting, is_www, is_ssl, is_https_redirect, ip, country, tag_id, is_ecommerce, has_catalog, license_type, last_updated) 
-            VALUE ({id}, '{realDomain}', '{title}', '{description}', '{keywords}', '{cities}', '{inn}', '{cms}', '{hosting}', '{www}', '{isSsl}', '{isHttpsRedirect}', '{ip}', '{country}', {tagId}, {isEcommerce}, '{hasCatalog}', '{licenseType}', '{lastUpdated}')
-            ON DUPLICATE KEY UPDATE real_domain='{realDomain}', title='{title}', description='{description}', keywords='{keywords}', city='{cities}', inn='{inn}', cms='{cms}', hosting='{hosting}', is_www='{www}', is_ssl='{isSsl}', is_https_redirect='{isHttpsRedirect}',  ip='{ip}', country='{country}', tag_id={tagId}, is_ecommerce={isEcommerce}, has_catalog={hasCatalog}, license_type='{licenseType}',  last_updated='{lastUpdated}'
-        """)
+        self.db.insertIntoDomainInfo(
+            id=id,
+            realDomain=realDomain,
+            title=title,
+            description=description,
+            keywords=keywords,
+            cities=cities,
+            inn=inn,
+            cms=cms,
+            hosting=hosting,
+            www=www,
+            isSsl=isSsl,
+            isHttpsRedirect=isHttpsRedirect,
+            ip=ip,
+            country=country,
+            tagId=tagId,
+            isEcommerce=isEcommerce,
+            hasCatalog=hasCatalog,
+            licenseType=licenseType,
+            lastUpdated=lastUpdated
+        )
 
         # Информация в таблицу domain_phones
         for number in numbers:
-            self.db.makeDbRequest(f"""
-                INSERT INTO {self.domainPhonesTableName} (domain_id, number) 
-                VALUE ({id}, {number})
-                ON DUPLICATE KEY UPDATE number='{number}'
-            """)
+            self.db.insertIntoDomainPhones(id=id, number=number)
 
         # Информация в таблицу domain_emails
         for email in emails:
             email = email.strip()
-            self.db.makeDbRequest(f"""
-                INSERT INTO {self.domainEmailsTableName} (domain_id, email) 
-                VALUE ({id}, '{email}')
-                ON DUPLICATE KEY UPDATE email='{email}'
-            """)
+            self.db.insertIntoDomainEmails(id=id, email=email)
 
         for inn in inns:
-            self.db.makeDbRequest(f"""
-                INSERT INTO company_info (domain_id, inn) 
-                VALUE ('{id}', '{inn}')
-                ON DUPLICATE KEY UPDATE domain_id='{id}', inn='{inn}'
-            """)
+            self.db.inserIntoCompanyInfo(id=id, inn=inn)
             
 
     async def httpRequest(self, domain):
@@ -345,11 +342,7 @@ class Parser:
 
         finally:
             if previousStatus != 200 and newStatus != 200:
-                self.db.makeDbRequest(f"""
-                    UPDATE {self.statusesTableName}
-                    SET status = {newStatus}
-                    WHERE id = {id}
-                """)
+                self.db.insertIntoDomains(id=id, realDomain="", status=newStatus)
         
         
     async def parseAllDomains(self):

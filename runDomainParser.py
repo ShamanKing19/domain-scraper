@@ -30,6 +30,7 @@ def runParser(portion, offset, domains):
 
 def main():
     loadDotEnv()
+    db = DbConnector()
 
     # Настройка аргументов при запуске через консоль
     argParser = argparse.ArgumentParser()
@@ -38,9 +39,9 @@ def main():
     argParser.add_argument("--portion")
     args = argParser.parse_args()
 
-    domainsCount = DbConnector().makeSingleDbRequest("SELECT count(*) FROM domains")["count(*)"]
-    firstId = DbConnector().makeSingleDbRequest("SELECT id FROM domains ORDER BY id ASC LIMIT 1")["id"]
-    lastId = DbConnector().makeSingleDbRequest("SELECT id FROM domains ORDER BY id DESC LIMIT 1")["id"]
+    domainsCount = db.getDomainsCount()
+    firstId = db.getFirstID()
+    lastId = db.getLastID()
 
     # * Начальный индекс для парсинга
     offset = 0
@@ -74,7 +75,7 @@ def main():
 
         # Парсинг всех сайтов
         try:
-            domains = DbConnector().makeDbRequest(f"SELECT * FROM domains WHERE id > {offset} LIMIT {step}")
+            domains = db.getDomainsPortion(fromID=offset, limit=step)
             offset = domains[-1]["id"]
         except Exception as e:
             domains = []
