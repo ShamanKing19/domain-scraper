@@ -106,7 +106,7 @@ class Parser:
         if invalidStatus:
             if cms == "Bitrix":
                 invalidStatus = 228
-                self.log("bitrixInvalid.txt", f"{realDomain} - {invalidStatus} - {banword}")
+                self.log("logs/invalidBitrix.txt", f"{realDomain} - {invalidStatus} - {banword}")
             self.db.makeDbRequest(f"""
                 INSERT INTO {self.statusesTableName} (id, domain, zone, real_domain, status) 
                 VALUE ('{id}', '{domain}', '{zone}', '{realDomain}', {invalidStatus})

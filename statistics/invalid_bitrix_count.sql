@@ -1,1 +1,1 @@
-SELECT * FROM domains WHERE status=228;
+SELECT count(*) FROM domains WHERE status=228;

@@ -1,0 +1,1 @@
+SELECT `cms`, count(`cms`) as `count` FROM domain_info GROUP BY `cms` ORDER BY `count` DESC;
