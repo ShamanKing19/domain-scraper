@@ -192,8 +192,8 @@ class InnParser:
         self.db.insertIntoCompanyInfo(id, companyFullName, companyType, segment, regionName, city, fullAddress, index, registrationDate, bossFullName, bossPostName, reviewsYandexMaps, reviewsGoogleMaps, authorizedCapitalAmount, registryDate, registryCategory, employeesNumber, mainTypeOfActivesName, lastFinanceYear)
  
         # company_additional_activities
-        for item in additionalActivities:
-            print(item)
+        # for item in additionalActivities:
+            # print(item)
             # self.db.insertIntoAdditionalActivities(inn, item['name'])
 
         
