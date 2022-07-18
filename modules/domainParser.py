@@ -19,25 +19,20 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from urllib.request import urlretrieve
 from genericpath import exists
+from fake_useragent import UserAgent
+
 
 import pymysql
 
 from modules.dbConnector import DbConnector
 from modules.validator import Validator
-from modules.tableCreator import TableCreator
 
 
 class Parser:
     def __init__(self, domains):
-        self.statusesTableName = "domains"
-        self.domainInfoTableName = "domain_info"
-        self.domainPhonesTableName = "domain_phones"
-        self.domainEmailsTableName = "domain_emails"
+        self.domains = domains
 
         self.db = DbConnector()
-        # self.connection = self.db.create_connection()
-
-        self.isTableExists = True
 
         ### Параметры парсера ###
         self.connectionTimeout = 5
@@ -45,10 +40,12 @@ class Parser:
         self.everyPrintable = 10000
 
         sessionTimeout = aiohttp.ClientTimeout(total=None, sock_connect=self.connectionTimeout, sock_read=self.readTimeout)
-        httpsConnector = aiohttp.TCPConnector(verify_ssl=True, limit=10000)
-        httpConnector = aiohttp.TCPConnector(verify_ssl=False, limit=10000)
-        self.httpsSession = aiohttp.ClientSession(connector=httpsConnector, timeout=sessionTimeout)
-        self.httpSession = aiohttp.ClientSession(connector=httpConnector, timeout=sessionTimeout, trust_env=True)
+        httpsConnector = aiohttp.TCPConnector(verify_ssl=True, limit=1000)
+        httpConnector = aiohttp.TCPConnector(verify_ssl=False, limit=1000)
+    
+        headers = {'user-agent': UserAgent().random}
+        self.httpsSession = aiohttp.ClientSession(connector=httpsConnector, timeout=sessionTimeout, headers=headers)
+        self.httpSession = aiohttp.ClientSession(connector=httpConnector, timeout=sessionTimeout, trust_env=True, headers = headers)
 
         
         # self.geoApi = "https://ipinfo.io/{{ip}}/json" #* Тут лимит 50к запросов в месяц, но определяет что угодно. САМАЯ ТОЧНАЯ
@@ -56,23 +53,8 @@ class Parser:
         # self.geoApi = "https://api.hostip.info/get_html.php?ip={{ip}}&position=true" #* Тоже не очень, мало находит
         self.geoApi = "https://ipgeolocation.abstractapi.com/v1/?api_key=f4b61e710fd846c48350bd35faacfc51&ip_address={{ip}}"
 
-        # Получение списка доменов и создание таблиц
-        # request_time = time.time()
-        if self.isTableExists:
-            self.domains = domains
-        # TODO: Сделать чтобы в случае чтения с файла он тоже брал инфу порциями
-        else:
-            table_creator = TableCreator()
-            table_creator.createTables()
-            self.downloadRuDomainsFileIfNotExists()
-            self.domains = self.getRowsFromTxt()
-            self.domainsCount = len(self.domains)
-
         ### Подготовленные данные для парсинга
-        # Категории
         self.categories = self.db.getCategories()
-        
-        # Регионы
         self.regions = self.db.getRegions()
 
         self.validator = Validator(self.regions)
@@ -253,7 +235,7 @@ class Parser:
             self.db.insertIntoDomainEmails(id=id, email=email)
 
         for inn in inns:
-            self.db.inserIntoCompanyInfo(id=id, inn=inn)
+            self.db.insertIntoInns(domainID=id, inn=inn)
             
 
     async def httpRequest(self, domain):

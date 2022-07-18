@@ -12,6 +12,7 @@ from modules.domainParser import Parser
 
 
 def log(filename, content):
+    if not os.path.exists("logs"): os.mkdir("logs")
     file = open(filename, "a", encoding="utf-8")
     file.write(content + "\n")
     file.close()
@@ -40,8 +41,8 @@ def main():
     args = argParser.parse_args()
 
     domainsCount = db.getDomainsCount()
-    firstId = db.getFirstID()
-    lastId = db.getLastID()
+    firstId = db.getFirstDomainID()
+    lastId = db.getLastDomainID()
 
     # * Начальный индекс для парсинга
     offset = 0

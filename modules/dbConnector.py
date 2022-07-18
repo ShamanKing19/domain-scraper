@@ -13,6 +13,32 @@ class DbConnector:
         self.connection = self.createConnection()
 
 
+    def getInnsPortion(self, startID, limit):
+        sql = f"SELECT * FROM inns WHERE id >= {startID} LIMIT {limit}"
+        return self.makeDbRequest(sql)
+
+    def insertIntoInns(self, inn, domainID = None):
+        if domainID:
+            sql = f"""
+                INSERT INTO inns (inn, domain_id) VALUE ({inn}, {domainID})
+                ON DUPLICATE KEY UPDATE inn={inn}, domain_id={domainID}    
+            """
+        else:
+            sql = f"""
+                INSERT INTO inns (inn) VALUE ({inn})  
+            """
+        self.makeDbRequest(sql)
+
+
+    def getLastInnID(self):
+        sql = "SELECT id FROM inns ORDER BY id DESC LIMIT 1"
+        return self.makeSingleDbRequest(sql)["id"]
+
+
+    def getFirstInnID(self):
+        sql = "SELECT id FROM inns ORDER BY id ASC LIMIT 1"
+        return self.makeSingleDbRequest(sql)["id"]
+
 
     def inserIntoCompanyInfo(self, id, inn):
         sql = f"""
@@ -81,12 +107,12 @@ class DbConnector:
         return self.makeDbRequest(sql)
 
 
-    def getLastID(self):
+    def getLastDomainID(self):
         sql = "SELECT id FROM domains ORDER BY id DESC LIMIT 1"
         return self.makeSingleDbRequest(sql)["id"]
 
 
-    def getFirstID(self):
+    def getFirstDomainID(self):
         sql = "SELECT id FROM domains ORDER BY id ASC LIMIT 1"
         return self.makeSingleDbRequest(sql)["id"]
 
