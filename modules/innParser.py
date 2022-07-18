@@ -5,7 +5,7 @@ import time
 
 import aiohttp
 import pymysql
-from fake_useragent import UserAgent
+# from fake_useragent import UserAgent
 
 from modules.dbConnector import DbConnector
 
@@ -14,8 +14,10 @@ class InnParser:
     def __init__(self, inns):
         self.inns = inns
         self.db = DbConnector()
-        self.userAgent = UserAgent().random
-        self.headers = {"user-agent": self.userAgent}
+        # self.userAgent = UserAgent().random
+        self.headers = {
+            "user-agent": "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:31.0) Gecko/20130401 Firefox/31.0"
+        }
         self.sessionTimeout = aiohttp.ClientTimeout(total=None, sock_connect=5, sock_read=5)
         self.connector = aiohttp.TCPConnector(ssl=False, limit=1000)
         self.session = aiohttp.ClientSession(connector=self.connector, timeout=self.sessionTimeout, trust_env=True, headers=self.headers)
@@ -74,7 +76,6 @@ class InnParser:
         companyShortName = responseJson.get("СвЮЛ", {}).get("СвНаимЮЛ", {}).get("@attributes", {}).get("НаимЮЛСокр", "").replace('\\"', "").replace("'", "")
 
         # ФИО, ИНН и должность руководителя
-        
         officialPerson = responseJson.get("СвЮЛ", {}).get("СведДолжнФЛ", {}) # может быть массивом из нескольких должностных лиц
         if isinstance(officialPerson, list):
             officialPerson = officialPerson[0]
@@ -98,9 +99,10 @@ class InnParser:
         # Учредители
         foundersInfo = []
         founders = responseJson.get("СвЮЛ", {}).get("СвУчредит", {}).get("УчрФЛ", [])
+        if isinstance(founders, dict): 
+            founders = [founders]
+        
         for founder in founders:
-            if not isinstance(founder, dict): continue
-
             # Имя
             firstName = founder.get("СвФЛ", {}).get("@attributes", {}).get("Имя", "")
             lastName = founder.get("СвФЛ", {}).get("@attributes", {}).get("Фамилия", "")
@@ -197,10 +199,9 @@ class InnParser:
             # self.db.insertIntoAdditionalActivities(inn, item['name'])
 
         
-
         # # company_founders
         for item in foundersInfo:
-            self.db.insertIntoCompanyFounders(id, founderFullName, founderInn, founderCapitalPartAmount, founderCapitalPartPercent)
+            self.db.insertIntoCompanyFounders(id, item["founder_full_name"], item["founder_inn"], item["founder_capital_part_amount"], item["founder_capital_part_percent"])
 
             
 
