@@ -1,7 +1,6 @@
 CREATE TABLE IF NOT EXISTS `company_info`(  
     `id` BIGINT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
-    `domain_id`  BIGINT UNSIGNED,
-    `inn` VARCHAR(20),
+    `inn_id`  BIGINT UNSIGNED,
     `name` VARCHAR(1000),
     `type` VARCHAR(1000),
     `segment` VARCHAR(255),
@@ -14,14 +13,12 @@ CREATE TABLE IF NOT EXISTS `company_info`(
     `boss_post` VARCHAR(255),
     `yandex_reviews` VARCHAR(500),
     `google_reviews` VARCHAR(500),
-    `authorized_capital_type` VARCHAR(255),
-    `authorized_capital_amount` INT(20),
+    `authorized_capital_amount` VARCHAR(255),
     `registry_date` DATE,
     `registry_category` VARCHAR(255),
     `employees_number` INT(10),
     `main_activity`  VARCHAR(255),  
     `last_finance_year` INT(4),
-      
-    FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`),
-    UNIQUE KEY (`inn`)
+    FOREIGN KEY (`inn_id`) REFERENCES `inns` (`id`),
+    UNIQUE KEY (`inn_id`)
 );

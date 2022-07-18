@@ -1,10 +1,10 @@
 CREATE TABLE IF NOT EXISTS `company_finances`(  
     `id` BIGINT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
-    `inn` VARCHAR(20),
+    `inn_id` BIGINT UNSIGNED NOT NULL,
     `year` INT(4),
     `income` DOUBLE,
     `outcome` DOUBLE,
     `profit` DOUBLE,
-    FOREIGN KEY (`inn`) REFERENCES `company_info` (`inn`),
-    UNIQUE KEY (`inn`, `year`)
+    FOREIGN KEY (`inn_id`) REFERENCES `inns` (`id`),
+    UNIQUE KEY (`inn_id`, `year`)
 );

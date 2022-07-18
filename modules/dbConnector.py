@@ -13,9 +13,47 @@ class DbConnector:
         self.connection = self.createConnection()
 
 
+    def insertIntoCompanyFounders(self, id, founderFullName, founderInn, founderCapitalPartAmount, founderCapitalPartPercent):
+        sql = f"""
+            INSERT INTO company_founders (inn_id, founder_full_name, founder_inn, founder_capital_part_amount, founder_capital_part_percent) 
+            VALUE ('{id}', '{founderFullName}', '{founderInn}', '{founderCapitalPartAmount}', '{founderCapitalPartPercent}')
+            ON DUPLICATE KEY UPDATE inn_id='{id}', founder_full_name='{founderFullName}', founder_inn='{founderInn}', founder_capital_part_amount='{founderCapitalPartAmount}', founder_capital_part_percent='{founderCapitalPartPercent}'
+        """
+        self.makeDbRequest(sql)
+
+
+    def insertIntoAdditionalActivities(self, inn, name):
+        sql = f"""
+            INSERT INTO company_additional_activities (inn, activity_name) 
+            VALUE ('{inn}', '{name}')
+            ON DUPLICATE KEY UPDATE inn='{inn}', activity_name='{name}'
+        """
+        self.makeDbRequest(sql)
+
+
+    # TODO: маппить это
+    def insertIntoCompanyInfo(self, innID, companyFullName, companyType, segment, regionName, city, fullAddress, index, registrationDate, bossFullName, bossPostName, reviewsYandexMaps, reviewsGoogleMaps, authorizedCapitalAmount, registryDate, registryCategory, employeesNumber, mainActivity, lastFinanceYear):
+        sql = f"""
+            INSERT INTO company_info (inn_id, name, type, segment, region, city, address, post_index, registration_date, boss_name, boss_post, yandex_reviews, google_reviews, authorized_capital_amount, registry_date, registry_category, employees_number, main_activity, last_finance_year) 
+            VALUE ({innID}, '{companyFullName}', '{companyType}', '{segment}', '{regionName}', '{city}', '{fullAddress}', '{index}', '{registrationDate}', '{bossFullName}', '{bossPostName}', '{reviewsYandexMaps}', '{reviewsGoogleMaps}', '{authorizedCapitalAmount}', '{registryDate}', '{registryCategory}', '{employeesNumber}', '{mainActivity}', '{lastFinanceYear}')
+            ON DUPLICATE KEY UPDATE inn_id={innID}, name='{companyFullName}', type='{companyType}', segment='{segment}', region='{regionName}', city='{city}', address='{fullAddress}', post_index='{index}', registration_date='{registrationDate}', boss_name='{bossFullName}', boss_post='{bossPostName}', yandex_reviews='{reviewsYandexMaps}', google_reviews='{reviewsGoogleMaps}', authorized_capital_amount='{authorizedCapitalAmount}', registry_date='{registryDate}', registry_category='{registryCategory}', employees_number='{employeesNumber}', main_activity='{mainActivity}', last_finance_year={lastFinanceYear}
+        """
+        self.makeDbRequest(sql)
+
+
+    def insertIntoCompanyFinances(self, innID, year, income, outcome, profit):
+        sql = f"""
+                INSERT INTO company_finances (inn_id, year, income, outcome, profit) 
+                VALUE ('{innID}', {year}, {income}, {outcome}, {profit})
+                ON DUPLICATE KEY UPDATE inn_id='{innID}', year={year}, income={income}, outcome={outcome}, profit={profit}
+        """
+        self.makeDbRequest(sql)
+
+
     def getInnsPortion(self, startID, limit):
         sql = f"SELECT * FROM inns WHERE id >= {startID} LIMIT {limit}"
         return self.makeDbRequest(sql)
+
 
     def insertIntoInns(self, inn, domainID = None):
         if domainID:
@@ -38,15 +76,6 @@ class DbConnector:
     def getFirstInnID(self):
         sql = "SELECT id FROM inns ORDER BY id ASC LIMIT 1"
         return self.makeSingleDbRequest(sql)["id"]
-
-
-    def inserIntoCompanyInfo(self, id, inn):
-        sql = f"""
-            INSERT INTO company_info (domain_id, inn) 
-            VALUE ('{id}', '{inn}')
-            ON DUPLICATE KEY UPDATE domain_id='{id}', inn='{inn}'
-        """
-        self.makeDbRequest(sql)
 
 
     def insertIntoDomainEmails(self, id, email):
