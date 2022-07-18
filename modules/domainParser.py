@@ -19,7 +19,7 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from urllib.request import urlretrieve
 from genericpath import exists
-from fake_useragent import UserAgent
+# from fake_useragent import UserAgent
 
 
 import pymysql
@@ -43,9 +43,11 @@ class Parser:
         httpsConnector = aiohttp.TCPConnector(verify_ssl=True, limit=1000)
         httpConnector = aiohttp.TCPConnector(verify_ssl=False, limit=1000)
     
-        headers = {'user-agent': UserAgent().random}
+        headers = {
+            'user-agent': "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:31.0) Gecko/20130401 Firefox/31.0"
+        }
         self.httpsSession = aiohttp.ClientSession(connector=httpsConnector, timeout=sessionTimeout, headers=headers)
-        self.httpSession = aiohttp.ClientSession(connector=httpConnector, timeout=sessionTimeout, trust_env=True, headers = headers)
+        self.httpSession = aiohttp.ClientSession(connector=httpConnector, timeout=sessionTimeout, trust_env=True, headers=headers)
 
         
         # self.geoApi = "https://ipinfo.io/{{ip}}/json" #* Тут лимит 50к запросов в месяц, но определяет что угодно. САМАЯ ТОЧНАЯ

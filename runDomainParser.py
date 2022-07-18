@@ -69,30 +69,29 @@ def main():
         step = domainsCount
         coresNumber = 1
 
-    while offset < lastId:
+    while startIndex < lastId:
         # Только для вывода
-        startID = offset
+        infoStartID = startIndex
         portionStartTime = time.time()
 
         # Парсинг всех сайтов
         try:
-            domains = db.getDomainsPortion(fromID=offset, limit=step)
-            offset = domains[-1]["id"]
+            domains = db.getDomainsPortion(fromID=startIndex, limit=step)
+            startIndex = domains[-1]["id"]
         except Exception as e:
             domains = []
-            offset = startID
+            startIndex = infoStartID
             log("requestError.txt", e)
 
-        process = Process(target=runParser, args=(step, offset, domains))
+        process = Process(target=runParser, args=(step, startIndex, domains))
         process.start()
         processes.append(process)
         if len(processes) == coresNumber:
             for process in processes:
                 process.join()
             processes.clear()
-            infoString = f"С {startID - (step*(coresNumber-1))} по {offset} за {time.time() - portionStartTime} - Общее время парсинга: {time.time() - globalStartTime} - {datetime.now()}"
-            print(infoString)
-            log("logs/stats.txt", infoString)
+            infoString = f"С {infoStartID - (step*(coresNumber-1))} по {startIndex} за {time.time() - portionStartTime} - Общее время парсинга: {time.time() - globalStartTime} - {datetime.now()}"
+            log("logs/stats200.txt", infoString)
 
     print(f"Парсинг c {startIndex} по {domainsCount} закончился за {time.time() - globalStartTime}")
 

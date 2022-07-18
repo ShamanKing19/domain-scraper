@@ -132,7 +132,7 @@ class DbConnector:
 
 
     def getDomainsPortion(self, fromID, limit):
-        sql = f"SELECT * FROM domains WHERE id > {fromID} LIMIT {limit}"
+        sql = f"SELECT * FROM domains WHERE id >= {fromID} LIMIT {limit}"
         return self.makeDbRequest(sql)
 
 

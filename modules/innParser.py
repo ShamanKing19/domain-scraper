@@ -113,7 +113,12 @@ class InnParser:
             
             # Доля (тыс. руб.)
             founderCapitalPartAmount = founder.get("ДоляУстКап", {}).get("@attributes", {}).get("НоминСтоим", 0)
-            founderCapitalPartPercent = founder.get("ДоляУстКап", {}).get("РазмерДоли", {}).get("Процент", 0)
+            # founderCapitalPartPercent = founder.get("ДоляУстКап", {}).get("РазмерДоли", {}).get("Процент", 0)
+            
+            if float(founderCapitalPartAmount) > 0 and float(authorizedCapitalAmount) > 0:
+                founderCapitalPartPercent = round(float(founderCapitalPartAmount) / float(authorizedCapitalAmount), 2) * 100
+            else:
+                founderCapitalPartPercent = 0
 
             foundersInfo.append(
                 {
