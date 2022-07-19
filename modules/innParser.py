@@ -7,13 +7,13 @@ import aiohttp
 import pymysql
 # from fake_useragent import UserAgent
 
-from modules.dbConnector import DbConnector
+from modules.dbClient import DbClient
 
 
 class InnParser:
     def __init__(self, inns):
         self.inns = inns
-        self.db = DbConnector()
+        self.db = DbClient()
         # self.userAgent = UserAgent().random
         self.headers = {
             "user-agent": "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:31.0) Gecko/20130401 Firefox/31.0"

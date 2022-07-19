@@ -1,14 +1,14 @@
 import csv
 
 from tqdm import tqdm
-from modules.dbConnector import DbConnector
+from modules.dbClient import DbClient
 
 
 class CSVLoader:
     def __init__(self):
         self.filePath = "data/secondLevelDomains.csv"
         self.domains = []
-        self.db = DbConnector()
+        self.db = DbClient()
 
 
     def run(self):

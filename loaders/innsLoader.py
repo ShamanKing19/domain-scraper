@@ -1,13 +1,13 @@
 import csv
 
 from tqdm import tqdm
-from modules.dbConnector import DbConnector
+from modules.dbClient import DbClient
 
 
 class InnLoader:
     def __init__(self):
         self.filePath = "data/inns.csv"
-        self.db = DbConnector()
+        self.db = DbClient()
 
 
     def run(self):

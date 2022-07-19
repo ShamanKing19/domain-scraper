@@ -7,7 +7,7 @@ import time
 
 from dotenv import load_dotenv
 
-from modules.dbConnector import DbConnector
+from modules.dbClient import DbClient
 from modules.domainParser import Parser
 
 
@@ -31,7 +31,7 @@ def runParser(portion, offset, domains):
 
 def main():
     loadDotEnv()
-    db = DbConnector()
+    db = DbClient()
 
     # Настройка аргументов при запуске через консоль
     argParser = argparse.ArgumentParser()

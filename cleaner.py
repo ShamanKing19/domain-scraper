@@ -4,13 +4,13 @@ from multiprocessing import Process
 import time
 
 from bs4 import BeautifulSoup
-from modules.dbConnector import DbConnector
+from modules.dbClient import DbClient
 from modules.validator import Validator
 
 
 class Cleaner:
     def __init__(self, domains):
-        self.db = DbConnector()
+        self.db = DbClient()
         self.regions = self.db.makeDbRequest("SELECT * FROM regions")
         self.validator = Validator(self.regions)
         
@@ -62,11 +62,11 @@ def runCleaner(step, offset, domains):
 
 
 if __name__ == "__main__":
-    db = DbConnector()
+    db = DbClient()
 
-    domainsCount = DbConnector().makeSingleDbRequest("SELECT count(*) FROM domain_info")["count(*)"]
-    firstId = DbConnector().makeSingleDbRequest("SELECT id FROM domain_info ORDER BY id ASC LIMIT 1")["id"]
-    lastId = DbConnector().makeSingleDbRequest("SELECT id FROM domain_info ORDER BY id DESC LIMIT 1")["id"]
+    domainsCount = DbClient().makeSingleDbRequest("SELECT count(*) FROM domain_info")["count(*)"]
+    firstId = DbClient().makeSingleDbRequest("SELECT id FROM domain_info ORDER BY id ASC LIMIT 1")["id"]
+    lastId = DbClient().makeSingleDbRequest("SELECT id FROM domain_info ORDER BY id DESC LIMIT 1")["id"]
 
     offset = 0
     portion = 10000

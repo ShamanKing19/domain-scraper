@@ -24,7 +24,7 @@ from genericpath import exists
 
 import pymysql
 
-from modules.dbConnector import DbConnector
+from modules.dbClient import DbClient
 from modules.validator import Validator
 
 
@@ -32,7 +32,7 @@ class Parser:
     def __init__(self, domains):
         self.domains = domains
 
-        self.db = DbConnector()
+        self.db = DbClient()
 
         ### Параметры парсера ###
         self.connectionTimeout = 5

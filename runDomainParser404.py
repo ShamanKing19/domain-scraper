@@ -7,7 +7,7 @@ import time
 
 from dotenv import load_dotenv
 
-from modules.dbConnector import DbConnector
+from modules.dbClient import DbClient
 from modules.domainParser import Parser
 
 
@@ -40,10 +40,10 @@ def main():
     argParser.add_argument("--portion")
     args = argParser.parse_args()
 
-    domainsCount = DbConnector().makeSingleDbRequest(
+    domainsCount = DbClient().makeSingleDbRequest(
         "SELECT count(*) FROM domains")["count(*)"]
-    firstId = DbConnector().makeSingleDbRequest("SELECT id FROM domains ORDER BY id ASC LIMIT 1")["id"]
-    lastId = DbConnector().makeSingleDbRequest("SELECT id FROM domains ORDER BY id DESC LIMIT 1")["id"]
+    firstId = DbClient().makeSingleDbRequest("SELECT id FROM domains ORDER BY id ASC LIMIT 1")["id"]
+    lastId = DbClient().makeSingleDbRequest("SELECT id FROM domains ORDER BY id DESC LIMIT 1")["id"]
 
     # * Начальный индекс для парсинга
     offset = 0
@@ -76,7 +76,7 @@ def main():
         startId = offset
 
         # Парсинг всех сайтов
-        domains = DbConnector().makeDbRequest(f"SELECT * FROM domains WHERE id >= {offset} AND status=404 LIMIT {step}")
+        domains = DbClient().makeDbRequest(f"SELECT * FROM domains WHERE id >= {offset} AND status=404 LIMIT {step}")
         offset = domains[-1]["id"]
 
         process = Process(target=runParser, args=(step, offset, domains))

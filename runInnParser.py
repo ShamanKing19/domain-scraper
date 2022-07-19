@@ -2,7 +2,7 @@ from datetime import datetime
 import os
 import time
 from multiprocessing import Process
-from modules.dbConnector import DbConnector
+from modules.dbClient import DbClient
 from modules.innParser import InnParser
 
 
@@ -19,7 +19,7 @@ def runParser(portion, offset, inns):
 
 
 def main():
-    db = DbConnector()
+    db = DbClient()
     innsCount = db.makeSingleDbRequest("SELECT count(inn) FROM inns")["count(inn)"]    
     firstID = db.getFirstInnID()
     lastID = db.getLastInnID()

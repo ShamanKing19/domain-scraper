@@ -4,7 +4,7 @@ import time
 import pymysql
 
 
-class DbConnector:
+class DbClient:
     def __init__(self):
         self.dbHost = os.environ.get("DB_HOST", "localhost")
         self.dbName = os.environ.get("DB_DATABASE", "admin_domains")

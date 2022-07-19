@@ -1,12 +1,12 @@
 try:
-    from dbConnector import DbConnector 
+    from dbClient import DbClient 
 except:
-    from modules.dbConnector import DbConnector
+    from modules.dbClient import DbClient
 
     
 class TableCreator:
     def __init__(self):
-        self.db = DbConnector()
+        self.db = DbClient()
 
 
     def createTables(self):
