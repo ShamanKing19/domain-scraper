@@ -13,6 +13,16 @@ class DbClient:
         self.connection = self.createConnection()
 
 
+    def getInfoWherePatternInDomain(self, pattern):
+        sql = f"""
+            SELECT domains.domain, domains.real_domain, domain_info.bitrix_id
+            FROM domain_info
+            JOIN domains ON domains.id = domain_info.domain_id
+            WHERE domains.domain LIKE '{pattern}' AND domain_info.bitrix_id IS NOT NULL
+        """
+        return self.makeDbRequest(sql)
+
+
     def insertIntoCompanyFounders(self, id, founderFullName, founderInn, founderCapitalPartAmount, founderCapitalPartPercent):
         sql = f"""
             INSERT INTO company_founders (inn_id, founder_full_name, founder_inn, founder_capital_part_amount, founder_capital_part_percent) 
