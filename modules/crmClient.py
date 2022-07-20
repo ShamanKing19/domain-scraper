@@ -52,8 +52,8 @@ class CrmClient:
     
     #* oldField должен быть в self.getUserFieldCode(key)
     async def updateDealData(self, dealID, params) -> aiohttp.ClientResponse:
-        updateDealRequest = await self.updateDeal(dealID, params)
-        dealContactsRequest = await self.getContacts(dealID, params)
+        updateDealRequest =  self.updateDeal(dealID, params)
+        dealContactsRequest =  self.getContacts(dealID, params)
 
         dealResponse = await asyncio.gather(updateDealRequest, dealContactsRequest)
         updateDealResponse = dealResponse[0]
@@ -77,6 +77,7 @@ class CrmClient:
     async def updateContact(self, id, params):
         method = "crm.contact.update"
         paramsString = self._getFormattedParamsString(id, params)
+        print(method + paramsString)
         return await self._makeCRMRequest(method + paramsString)
 
 
