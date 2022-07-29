@@ -2,6 +2,8 @@ from datetime import datetime
 import os
 import time
 from multiprocessing import Process
+
+from tqdm import tqdm
 from modules.dbClient import DbClient
 from modules.innParser import InnParser
 
@@ -40,29 +42,31 @@ def main():
         step = innsCount
         coresNumber = 1
 
-    while startIndex < lastID:
-        # Только для вывода
-        infoStartID = startIndex
-        portionStartTime = time.time()
+    with tqdm(total=innsCount) as pbar: 
+        while startIndex < lastID:
+            # Только для вывода
+            infoStartID = startIndex
+            portionStartTime = time.time()
 
-        try:
-            inns = db.getInnsPortion(startIndex, step)
-            startIndex = inns[-1]["id"]
-        except Exception as e:
-            inns = []
-            startIndex = infoStartID
-            log("innRequestError.txt", e)
+            try:
+                inns = db.getDomainInnsPortion(startIndex, step)
+                startIndex = inns[-1]["id"]
+            except Exception as e:
+                inns = []
+                startIndex = infoStartID
+                # log("innRequestError.txt", e)
 
-        process = Process(target=runParser, args=(step, startIndex, inns))
-        process.start()
-        processes.append(process)
-        if len(processes) == coresNumber:
-            for process in processes:
-                process.join()
-            processes.clear()
-            outputString = f"С {infoStartID - (step*(coresNumber-1))} по {startIndex} за {time.time() - portionStartTime} - Общее время парсинга: {time.time() - globalStartTime} - {datetime.now()}"
-            log("logs/statsINN.txt", outputString)
-    print(f"Парсинг c {firstID} по {lastID} закончился за {time.time() - globalStartTime}")
+            process = Process(target=runParser, args=(step, startIndex, inns))
+            process.start()
+            processes.append(process)
+            if len(processes) == coresNumber:
+                for process in processes:
+                    process.join()
+                processes.clear()
+                outputString = f"С {infoStartID - (step*(coresNumber-1))} по {startIndex} за {time.time() - portionStartTime} - Общее время парсинга: {time.time() - globalStartTime} - {datetime.now()}"
+                log("logs/statsINN.txt", outputString)
+                pbar.update(1)
+        print(f"Парсинг c {firstID} по {lastID} закончился за {time.time() - globalStartTime}")
 
     
 if __name__ == "__main__":

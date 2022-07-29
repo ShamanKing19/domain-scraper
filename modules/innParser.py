@@ -26,7 +26,7 @@ class InnParser:
     def run(self):
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self.parseInns())
-            
+
 
     async def parseInns(self):
         requests = []
@@ -35,7 +35,7 @@ class InnParser:
             id = item["id"]
             inn = item["inn"]
             request = self.getInfoByInn(id, inn, self.session)
-            requests.append(request)    
+            requests.append(request)
             await asyncio.gather(*requests)
             requests.clear()
         await self.session.close()
@@ -45,17 +45,17 @@ class InnParser:
         url = f"https://egrul.itsoft.ru/{inn}.json"
         try:
             response = await session.get(url)
-        except (ConnectionError, aiohttp.ServerTimeoutError)  as error:
-            print(error)
+        except (ConnectionError, aiohttp.ServerTimeoutError) as error:
+            # print(error)
             return
 
         try:
             responseJson = await response.json()
         except aiohttp.ContentTypeError as error:
-            print(error)
+            # print(error)
             return
-        
-        
+
+
         # Address
         address = responseJson.get("СвЮЛ", {}).get("СвАдресЮЛ", {}).get("АдресРФ", {})
         index = address.get("@attributes", {}).get("Индекс", "")
@@ -63,7 +63,6 @@ class InnParser:
         buildingNumber = address.get("@attributes", {}).get("Дом", "")
         buildingFloor = address.get("@attributes", {}).get("Корпус", "")
         buildingRoomNumber = address.get("@attributes", {}).get("Кварт", "")
-
 
         regionName = address.get("Регион", {}).get("@attributes", {}).get("НаимРегион", "")
         regionType = address.get("Регион", {}).get("@attributes", {}).get("ТипРегион", "")
@@ -78,10 +77,11 @@ class InnParser:
         companyShortName = responseJson.get("СвЮЛ", {}).get("СвНаимЮЛ", {}).get("@attributes", {}).get("НаимЮЛСокр", "").replace('\\"', "").replace("'", "")
 
         # ФИО, ИНН и должность руководителя
-        officialPerson = responseJson.get("СвЮЛ", {}).get("СведДолжнФЛ", {}) # может быть массивом из нескольких должностных лиц
+        # может быть массивом из нескольких должностных лиц
+        officialPerson = responseJson.get("СвЮЛ", {}).get("СведДолжнФЛ", {})
         if isinstance(officialPerson, list):
             officialPerson = officialPerson[0]
-        
+
         bossLastname = officialPerson.get("СвФЛ", {}).get("@attributes", {}).get("Фамилия", "")
         bossFirstname = officialPerson.get("СвФЛ", {}).get("@attributes", {}).get("Имя", "")
         bossMiddlename = officialPerson.get("СвФЛ", {}).get("@attributes", {}).get("Отчество", "")
@@ -97,13 +97,12 @@ class InnParser:
         authorizedCapitalAmount = responseJson.get("СвЮЛ", {}).get("СвУстКап", {}).get("@attributes", {}).get("СумКап", 0)
         authorizedCapitalType = responseJson.get("СвЮЛ", {}).get("СвУстКап", {}).get("@attributes", {}).get("НаимВидКап", "")
 
-
         # Учредители
         foundersInfo = []
         founders = responseJson.get("СвЮЛ", {}).get("СвУчредит", {}).get("УчрФЛ", [])
-        if isinstance(founders, dict): 
+        if isinstance(founders, dict):
             founders = [founders]
-        
+
         for founder in founders:
             # Имя
             firstName = founder.get("СвФЛ", {}).get("@attributes", {}).get("Имя", "")
@@ -112,11 +111,11 @@ class InnParser:
 
             founderFullName = f'{lastName} {firstName} {middleName}'.strip()
             founderInn = founder.get("СвФЛ", {}).get("@attributes", {}).get("ИННФЛ", "")
-            
+
             # Доля (тыс. руб.)
             founderCapitalPartAmount = founder.get("ДоляУстКап", {}).get("@attributes", {}).get("НоминСтоим", 0)
             # founderCapitalPartPercent = founder.get("ДоляУстКап", {}).get("РазмерДоли", {}).get("Процент", 0)
-            
+
             if float(founderCapitalPartAmount) > 0 and float(authorizedCapitalAmount) > 0:
                 founderCapitalPartPercent = round(float(founderCapitalPartAmount) / float(authorizedCapitalAmount), 2) * 100
             else:
@@ -129,7 +128,7 @@ class InnParser:
                     "founder_capital_part_amount": founderCapitalPartAmount,
                     "founder_capital_part_percent": founderCapitalPartPercent,
                 }
-            ) 
+            )
 
         #! Реестр СМСП микропредприятие
         registryCategory = responseJson.get("fin", {}).get("msp", {}).get("@attributes", {}).get("cat", "") # Тут номер 1 это "микропредприятие"
@@ -154,13 +153,11 @@ class InnParser:
                 financeYearsData.append(data)
                 lastFinanceYear = int(data.get("year", ""))
 
-
-        ### Виды деятельности
+        # Виды деятельности
         # Основной вид деятельности
         mainTypeOfActivesName = responseJson.get("СвЮЛ", {}).get("СвОКВЭД", {}).get("СвОКВЭДОсн", {}).get("@attributes", {}).get("НаимОКВЭД", "")
         mainTypeOfActivesCode = responseJson.get("СвЮЛ", {}).get("СвОКВЭД", {}).get("СвОКВЭДОсн", {}).get("@attributes", {}).get("КодОКВЭД", "")
         mainTypeOfActivesDate = responseJson.get("СвЮЛ", {}).get("СвОКВЭД", {}).get("СвОКВЭДОсн", {}).get("@attributes", {}).get("ПрВерсОКВЭД", "")
-
 
         # Дополнительные виды деятельности
         additionalActivities = []
@@ -175,45 +172,40 @@ class InnParser:
             }
             additionalActivities.append(data)
 
-
         street = f"{streetType} {streetName}"
         building = f"{buildingNumber}, {buildingFloor}, {buildingRoomNumber}"
-        fullAddress = f"{street}, {building}".strip(" ,") if buildingNumber else street 
+        fullAddress = f"{street}, {building}".strip(" ,") if buildingNumber else street
         bossFullName = f"{bossLastname} {bossFirstname} {bossMiddlename}"
-        
+
         location = cityName if cityName else regionName
         compName = companyShortName if companyShortName else companyFullName
         requestData = [compName, location, index]
         requestDataString = "+".join(requestData).replace(" ", "%20").replace("\"", "").replace("'", "")
         reviewsYandexMaps = f"https://yandex.ru/maps/?text={requestDataString}"
         reviewsGoogleMaps = f"https://www.google.ru/maps?q={requestDataString}"
-
         
+        # company_info
+        segment = self.getSegment(financeYearsData[-1]) if financeYearsData else ""
+        city = cityName if cityName.strip() else regionName
+        self.db.insertIntoDomainCompanyInfo(id, inn, companyFullName, companyType, segment, regionName, city, fullAddress, index, registrationDate, bossFullName, bossPostName, reviewsYandexMaps, reviewsGoogleMaps, authorizedCapitalAmount, registryDate, registryCategory, employeesNumber, mainTypeOfActivesName, lastFinanceYear)
+
         # company_finances
         item = ""
         for item in financeYearsData:
             self.db.insertIntoDomainCompanyFinances(id, item['year'], item['income'], item['outcome'], item['profit'])
-        segment = self.getSegment(item)
 
 
-        # company_info
-        city = cityName if cityName.strip() else regionName
-        self.db.insertIntoDomainCompanyInfo(id, companyFullName, companyType, segment, regionName, city, fullAddress, index, registrationDate, bossFullName, bossPostName, reviewsYandexMaps, reviewsGoogleMaps, authorizedCapitalAmount, registryDate, registryCategory, employeesNumber, mainTypeOfActivesName, lastFinanceYear)
- 
         # company_additional_activities
         # for item in additionalActivities:
-            # print(item)
-            # self.db.insertIntoAdditionalActivities(inn, item['name'])
+        # print(item)
+        # self.db.insertIntoAdditionalActivities(inn, item['name'])
 
-        
         # # company_founders
         for item in foundersInfo:
             self.db.insertIntoDomainCompanyFounders(id, item["founder_full_name"], item["founder_inn"], item["founder_capital_part_amount"], item["founder_capital_part_percent"])
 
-            
-
     def getSegment(self, item):
-        if not item: return None  
+        if not item: return None
         # В милилонах!
         segments = [
             {
