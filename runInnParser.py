@@ -20,7 +20,7 @@ def runParser(portion, offset, inns):
 
 def main():
     db = DbClient()
-    innsCount = db.makeSingleDbRequest("SELECT count(inn) FROM inns")["count(inn)"]    
+    innsCount = db.makeSingleDbRequest("SELECT count(inn) FROM domain_inns")["count(inn)"]    
     firstID = db.getFirstInnID()
     lastID = db.getLastInnID()
     startID = firstID

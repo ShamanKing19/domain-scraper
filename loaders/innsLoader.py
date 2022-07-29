@@ -8,6 +8,8 @@ class InnLoader:
     def __init__(self):
         self.filePath = "data/inns.csv"
         self.db = DbClient()
+        self.totalRows = 24089103
+        self.limit = 100000
 
 
     def run(self):
@@ -17,7 +19,7 @@ class InnLoader:
 
     def loadInns(self, inns):
         print("Переношу в базу...")
-        for inn in tqdm(inns, total=24089103):
+        for inn in tqdm(inns, total=self.totalRows):
             self.db.insertIntoInns(inn)
         print(f"Всё. Добавил {len(inns)} записей")
 
@@ -27,7 +29,8 @@ class InnLoader:
         inns = set()
         with open(self.filePath, newline='') as csvfile:
             reader = csv.DictReader(csvfile)
-            for row in tqdm(reader):
+            for i, row in tqdm(enumerate(reader), total=self.totalRows):
+                if i > self.limit: break
                 inns.add(row["inn"])
         return list(inns)
 

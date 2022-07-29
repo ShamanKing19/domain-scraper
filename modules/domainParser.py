@@ -238,6 +238,8 @@ class Parser:
 
         for inn in inns:
             self.db.insertIntoInns(domainID=id, inn=inn)
+            #! Дубли таблиц для быстрых запросов
+            self.db.insertIntoDomainInns(domainID=id, inn=inn)
             
 
     async def httpRequest(self, domain):

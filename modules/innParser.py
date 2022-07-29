@@ -43,15 +43,16 @@ class InnParser:
 
     async def getInfoByInn(self, id, inn, session):
         url = f"https://egrul.itsoft.ru/{inn}.json"
-        
         try:
             response = await session.get(url)
         except (ConnectionError, aiohttp.ServerTimeoutError)  as error:
+            print(error)
             return
 
         try:
             responseJson = await response.json()
         except aiohttp.ContentTypeError as error:
+            print(error)
             return
         
         
@@ -62,6 +63,7 @@ class InnParser:
         buildingNumber = address.get("@attributes", {}).get("Дом", "")
         buildingFloor = address.get("@attributes", {}).get("Корпус", "")
         buildingRoomNumber = address.get("@attributes", {}).get("Кварт", "")
+
 
         regionName = address.get("Регион", {}).get("@attributes", {}).get("НаимРегион", "")
         regionType = address.get("Регион", {}).get("@attributes", {}).get("ТипРегион", "")
@@ -190,13 +192,13 @@ class InnParser:
         # company_finances
         item = ""
         for item in financeYearsData:
-            self.db.insertIntoCompanyFinances(id, item['year'], item['income'], item['outcome'], item['profit'])
+            self.db.insertIntoDomainCompanyFinances(id, item['year'], item['income'], item['outcome'], item['profit'])
         segment = self.getSegment(item)
 
 
         # company_info
         city = cityName if cityName.strip() else regionName
-        self.db.insertIntoCompanyInfo(id, companyFullName, companyType, segment, regionName, city, fullAddress, index, registrationDate, bossFullName, bossPostName, reviewsYandexMaps, reviewsGoogleMaps, authorizedCapitalAmount, registryDate, registryCategory, employeesNumber, mainTypeOfActivesName, lastFinanceYear)
+        self.db.insertIntoDomainCompanyInfo(id, companyFullName, companyType, segment, regionName, city, fullAddress, index, registrationDate, bossFullName, bossPostName, reviewsYandexMaps, reviewsGoogleMaps, authorizedCapitalAmount, registryDate, registryCategory, employeesNumber, mainTypeOfActivesName, lastFinanceYear)
  
         # company_additional_activities
         # for item in additionalActivities:
@@ -206,7 +208,7 @@ class InnParser:
         
         # # company_founders
         for item in foundersInfo:
-            self.db.insertIntoCompanyFounders(id, item["founder_full_name"], item["founder_inn"], item["founder_capital_part_amount"], item["founder_capital_part_percent"])
+            self.db.insertIntoDomainCompanyFounders(id, item["founder_full_name"], item["founder_inn"], item["founder_capital_part_amount"], item["founder_capital_part_percent"])
 
             
 

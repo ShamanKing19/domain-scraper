@@ -13,6 +13,22 @@ class DbClient:
         self.connection = self.createConnection()
 
 
+    def getInnsWithDomains(self):
+        sql = f"""
+            SELECT * FROM inns
+            WHERE domain_id IS NOT NULL
+        """
+        return self.makeDbRequest(sql)
+
+
+    def deleteFromDomainInfoWhere(self, id, realDomain):
+        sql = f"""
+            DELETE FROM domain_info
+            WHERE real_domain = '{realDomain}' AND id != {id} 
+        """
+        self.makeDbRequest(sql)
+
+
     def getInfoWherePatternInDomain(self, pattern):
         sql = f"""
             SELECT domains.domain, domains.real_domain, domain_info.bitrix_id
@@ -21,6 +37,15 @@ class DbClient:
             WHERE domains.domain LIKE '{pattern}' AND domain_info.bitrix_id IS NOT NULL
         """
         return self.makeDbRequest(sql)
+
+
+    def insertIntoDomainCompanyFounders(self, id, founderFullName, founderInn, founderCapitalPartAmount, founderCapitalPartPercent):
+        sql = f"""
+            INSERT INTO domain_company_founders (inn_id, founder_full_name, founder_inn, founder_capital_part_amount, founder_capital_part_percent) 
+            VALUE ('{id}', '{founderFullName}', '{founderInn}', '{founderCapitalPartAmount}', '{founderCapitalPartPercent}')
+            ON DUPLICATE KEY UPDATE inn_id='{id}', founder_full_name='{founderFullName}', founder_inn='{founderInn}', founder_capital_part_amount='{founderCapitalPartAmount}', founder_capital_part_percent='{founderCapitalPartPercent}'
+        """
+        self.makeDbRequest(sql)
 
 
     def insertIntoCompanyFounders(self, id, founderFullName, founderInn, founderCapitalPartAmount, founderCapitalPartPercent):
@@ -41,12 +66,30 @@ class DbClient:
         self.makeDbRequest(sql)
 
 
+    def insertIntoDomainCompanyInfo(self, innID, inn, companyFullName, companyType, segment, regionName, city, fullAddress, index, registrationDate, bossFullName, bossPostName, reviewsYandexMaps, reviewsGoogleMaps, authorizedCapitalAmount, registryDate, registryCategory, employeesNumber, mainActivity, lastFinanceYear):
+        sql = f"""
+            INSERT INTO domain_company_info (inn_id, inn, name, type, segment, region, city, address, post_index, registration_date, boss_name, boss_post, yandex_reviews, google_reviews, authorized_capital_amount, registry_date, registry_category, employees_number, main_activity, last_finance_year) 
+            VALUE ({innID}, '{inn}', '{companyFullName}', '{companyType}', '{segment}', '{regionName}', '{city}', '{fullAddress}', '{index}', '{registrationDate}', '{bossFullName}', '{bossPostName}', '{reviewsYandexMaps}', '{reviewsGoogleMaps}', '{authorizedCapitalAmount}', '{registryDate}', '{registryCategory}', '{employeesNumber}', '{mainActivity}', '{lastFinanceYear}')
+            ON DUPLICATE KEY UPDATE inn_id={innID}, inn='{inn}', name='{companyFullName}', type='{companyType}', segment='{segment}', region='{regionName}', city='{city}', address='{fullAddress}', post_index='{index}', registration_date='{registrationDate}', boss_name='{bossFullName}', boss_post='{bossPostName}', yandex_reviews='{reviewsYandexMaps}', google_reviews='{reviewsGoogleMaps}', authorized_capital_amount='{authorizedCapitalAmount}', registry_date='{registryDate}', registry_category='{registryCategory}', employees_number='{employeesNumber}', main_activity='{mainActivity}', last_finance_year={lastFinanceYear}
+        """
+        self.makeDbRequest(sql)
+
+
     # TODO: маппить это
     def insertIntoCompanyInfo(self, innID, companyFullName, companyType, segment, regionName, city, fullAddress, index, registrationDate, bossFullName, bossPostName, reviewsYandexMaps, reviewsGoogleMaps, authorizedCapitalAmount, registryDate, registryCategory, employeesNumber, mainActivity, lastFinanceYear):
         sql = f"""
             INSERT INTO company_info (inn_id, name, type, segment, region, city, address, post_index, registration_date, boss_name, boss_post, yandex_reviews, google_reviews, authorized_capital_amount, registry_date, registry_category, employees_number, main_activity, last_finance_year) 
             VALUE ({innID}, '{companyFullName}', '{companyType}', '{segment}', '{regionName}', '{city}', '{fullAddress}', '{index}', '{registrationDate}', '{bossFullName}', '{bossPostName}', '{reviewsYandexMaps}', '{reviewsGoogleMaps}', '{authorizedCapitalAmount}', '{registryDate}', '{registryCategory}', '{employeesNumber}', '{mainActivity}', '{lastFinanceYear}')
             ON DUPLICATE KEY UPDATE inn_id={innID}, name='{companyFullName}', type='{companyType}', segment='{segment}', region='{regionName}', city='{city}', address='{fullAddress}', post_index='{index}', registration_date='{registrationDate}', boss_name='{bossFullName}', boss_post='{bossPostName}', yandex_reviews='{reviewsYandexMaps}', google_reviews='{reviewsGoogleMaps}', authorized_capital_amount='{authorizedCapitalAmount}', registry_date='{registryDate}', registry_category='{registryCategory}', employees_number='{employeesNumber}', main_activity='{mainActivity}', last_finance_year={lastFinanceYear}
+        """
+        self.makeDbRequest(sql)
+
+
+    def insertIntoDomainCompanyFinances(self, innID, year, income, outcome, profit):
+        sql = f"""
+                INSERT INTO domain_company_finances (inn_id, year, income, outcome, profit) 
+                VALUE ('{innID}', {year}, {income}, {outcome}, {profit})
+                ON DUPLICATE KEY UPDATE inn_id='{innID}', year={year}, income={income}, outcome={outcome}, profit={profit}
         """
         self.makeDbRequest(sql)
 
@@ -60,20 +103,33 @@ class DbClient:
         self.makeDbRequest(sql)
 
 
+    def getDomainInnsPortion(self, startID, limit):
+        sql = f"SELECT * FROM domain_inns WHERE id >= {startID} LIMIT {limit}"
+        return self.makeDbRequest(sql)
+
+
     def getInnsPortion(self, startID, limit):
         sql = f"SELECT * FROM inns WHERE id >= {startID} LIMIT {limit}"
         return self.makeDbRequest(sql)
 
 
+    def insertIntoDomainInns(self, inn, domainId):
+        sql = f"""
+            INSERT INTO domain_inns (inn, domain_id) VALUE ('{inn}', {domainId})
+            ON DUPLICATE KEY UPDATE id=id   
+        """
+        self.makeDbRequest(sql)
+
+
     def insertIntoInns(self, inn, domainID = None):
         if domainID:
             sql = f"""
-                INSERT INTO inns (inn, domain_id) VALUE ({inn}, {domainID})
-                ON DUPLICATE KEY UPDATE inn={inn}, domain_id={domainID}    
+                INSERT INTO inns (inn, domain_id) VALUE ('{inn}', {domainID})
+                ON DUPLICATE KEY UPDATE inn='{inn}', domain_id={domainID}    
             """
         else:
             sql = f"""
-                INSERT INTO inns (inn) VALUE ({inn})  
+                INSERT INTO inns (inn) VALUE ('{inn}')  
             """
         self.makeDbRequest(sql)
 
