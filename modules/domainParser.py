@@ -237,9 +237,9 @@ class Parser:
             self.db.insertIntoDomainEmails(id=id, email=email)
 
         for inn in inns:
-            self.db.insertIntoInns(domainID=id, inn=inn)
+            self.db.insertIntoInns(domainId=id, inn=inn)
             #! Дубли таблиц для быстрых запросов
-            self.db.insertIntoDomainInns(domainID=id, inn=inn)
+            self.db.insertIntoDomainInns(domainId=id, inn=inn)
             
 
     async def httpRequest(self, domain):

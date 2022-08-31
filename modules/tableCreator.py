@@ -66,18 +66,25 @@ class TableCreator:
         with open("migrations/company_finances_migration.sql", "r", encoding="utf-8") as migration:
             self.db.makeDbRequest(migration.read()) 
         
-        # additional_activities_migration TABLE creation
+        # additional_activities TABLE creation
         with open("migrations/additional_activities_migration.sql", "r", encoding="utf-8") as migration:
             self.db.makeDbRequest(migration.read())
         
-        # company_additional_activities_migration TABLE creation
+        # company_additional_activities TABLE creation
         with open("migrations/company_additional_activities_migration.sql", "r", encoding="utf-8") as migration:
             self.db.makeDbRequest(migration.read())
          
-        # company_founders_migration TABLE creation
+        # company_founders TABLE creation
         with open("migrations/company_founders_migration.sql", "r", encoding="utf-8") as migration:
             self.db.makeDbRequest(migration.read())
 
+        # domain_inns TABLE creation    
+        with open("migrations/domain_inns_migration.sql", "r", encoding="utf-8") as migration:
+            self.db.makeDbRequest(migration.read())
+
+        # inns TABLE creation    
+        with open("migrations/inns_migration.sql", "r", encoding="utf-8") as migration:
+            self.db.makeDbRequest(migration.read())
 
 
 def main():

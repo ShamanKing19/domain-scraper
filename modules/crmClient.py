@@ -77,7 +77,6 @@ class CrmClient:
     async def updateContact(self, id, params):
         method = "crm.contact.update"
         paramsString = self._getFormattedParamsString(id, params)
-        print(method + paramsString)
         return await self._makeCRMRequest(method + paramsString)
 
 
@@ -156,6 +155,7 @@ class CrmClient:
                     return await response.json()
                 except aiohttp.ContentTypeError as e:
                     # print(await response.text())
+                    log("errors.txt", e.message)                    
                     return {}
 
 
@@ -258,6 +258,10 @@ class CrmClient:
         return deals
 
 
+def log(filename, text):
+    file = open("logs/" + filename, "w", encoding="utf-8")
+    file.write(text)
+    file.close()
 
 
 def logJson(filename, text):

@@ -42,7 +42,7 @@ def main():
         step = innsCount
         coresNumber = 1
 
-    with tqdm(total=innsCount) as pbar: 
+    with tqdm(total=innsCount/step) as pbar: 
         while startIndex < lastID:
             # Только для вывода
             infoStartID = startIndex

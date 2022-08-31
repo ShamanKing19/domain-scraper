@@ -121,11 +121,11 @@ class DbClient:
         self.makeDbRequest(sql)
 
 
-    def insertIntoInns(self, inn, domainID = None):
-        if domainID:
+    def insertIntoInns(self, inn, domainId = None):
+        if domainId:
             sql = f"""
-                INSERT INTO inns (inn, domain_id) VALUE ('{inn}', {domainID})
-                ON DUPLICATE KEY UPDATE inn='{inn}', domain_id={domainID}    
+                INSERT INTO inns (inn, domain_id) VALUE ('{inn}', {domainId})
+                ON DUPLICATE KEY UPDATE inn='{inn}', domain_id={domainId}    
             """
         else:
             sql = f"""
